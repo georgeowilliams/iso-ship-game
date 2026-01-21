@@ -1,4 +1,5 @@
 import { pruneProjectiles, resolveMove, resolveShoot, resolveNoop } from "./rules.js";
+import { createInitialState } from "./state.js";
 
 /**
  * TurnEngine owns:
@@ -91,5 +92,12 @@ export class TurnEngine {
       return { type: "shoot", label: "VOTE: SHOOT" };
     }
     return { type: "move", move: choice, label: `VOTE: ${choice}` };
+  }
+
+  loadMap(mapDef) {
+    this.state = createInitialState(mapDef);
+    this.nextTickAt = this.now() + this.turnMs;
+    this.lastOutcome = null;
+    this.lastMoveSteps = null;
   }
 }

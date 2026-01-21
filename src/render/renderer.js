@@ -1,33 +1,67 @@
 import { DIR_V } from "../core/constants.js";
-import { computeMoveSteps, inBounds, makeBlockedSet, isBlocked } from "../core/rules.js";
+import { computeMoveSteps, inBounds, makeBlockedMap, isBlocked } from "../core/rules.js";
 import { gridToIsoTop, tileCenter, computeGridCorners, computeOrigin } from "./iso.js";
 import { clamp01, lerp } from "../util/math.js";
 
 export class CanvasRenderer {
-  constructor(canvas) {
+  constructor(canvas, assetManager = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
+    this.assetManager = assetManager;
   }
 
-  render({ state, msLeft, lastMoveSteps }) {
+  render({ state, msLeft, lastMoveSteps, map }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
 
     ctx.clearRect(0, 0, width, height);
+
+    const theme = map?.theme?.assets;
+    const backgroundImage = theme?.background?.image;
+    const bg = backgroundImage ? this.assetManager?.get(backgroundImage) : null;
+    if (bg) {
+      ctx.drawImage(bg, 0, 0, width, height);
+    } else {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+    }
 
     // tile sizing tuned for big canvas
     const tileW = Math.floor(Math.min(width, height) / (state.cols + state.rows) * 1.85);
     const tileH = Math.floor(tileW / 2);
 
     const { originX, originY, pad } = computeOrigin(state, width, height, tileW, tileH);
-    const blockedSet = makeBlockedSet(state.blocked);
+    const blockedMap = makeBlockedMap(state.blocked);
+    const tileVariants = theme?.tiles?.variants ?? [];
+    const blockedKinds = theme?.blocked?.kinds ?? {};
 
     // --- tiles ---
     for (let gy = 0; gy < state.rows; gy++) {
       for (let gx = 0; gx < state.cols; gx++) {
         const { sx, sy } = gridToIsoTop(gx, gy, originX, originY, tileW, tileH);
-        const fill = isBlocked(blockedSet, gx, gy) ? "#000" : (((gx + gy) % 2 === 0) ? "#f2f2f2" : "#fff");
-        drawDiamond(ctx, sx, sy, tileW, tileH, fill);
+        if (tileVariants.length > 0) {
+          const tileIndex = tileVariantIndex(state.mapSeed ?? 0, gx, gy, tileVariants.length);
+          const tileUrl = tileVariants[tileIndex];
+          const tileImage = this.assetManager?.get(tileUrl);
+          if (tileImage) {
+            drawTileImage(ctx, tileImage, sx, sy, tileW, tileH);
+          } else {
+            drawDiamond(ctx, sx, sy, tileW, tileH, "#f2f2f2");
+          }
+        } else {
+          drawDiamond(ctx, sx, sy, tileW, tileH, "#f2f2f2");
+        }
+
+        if (isBlocked(blockedMap, gx, gy)) {
+          const kind = blockedMap.get(`${gx},${gy}`);
+          const blockedUrl = blockedKinds[kind] ?? blockedKinds.fallback;
+          const blockedImage = this.assetManager?.get(blockedUrl);
+          if (blockedImage) {
+            drawTileImage(ctx, blockedImage, sx, sy, tileW, tileH);
+          } else {
+            drawDiamond(ctx, sx, sy, tileW, tileH, "#000");
+          }
+        }
       }
     }
 
@@ -43,7 +77,7 @@ export class CanvasRenderer {
         const s1 = steps[0];
         let tint1 = "rgba(255,255,0,0.12)";
         if (!inBounds(state, s1.x, s1.y)) tint1 = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedSet, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
+        else if (isBlocked(blockedMap, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
       }
 
@@ -51,7 +85,7 @@ export class CanvasRenderer {
         const last = steps[steps.length - 1];
         let tint = "rgba(0,255,0,0.18)";
         if (!inBounds(state, last.x, last.y)) tint = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedSet, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
+        else if (isBlocked(blockedMap, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, last.x, last.y, originX, originY, tileW, tileH, tint);
       }
     }
@@ -124,6 +158,12 @@ function drawDiamond(ctx, sx, sy, tileW, tileH, fillStyle) {
   ctx.stroke();
 }
 
+function drawTileImage(ctx, image, sx, sy, tileW, tileH) {
+  const x = sx - tileW / 2;
+  const y = sy;
+  ctx.drawImage(image, x, y, tileW, tileH);
+}
+
 function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba) {
   if (gx < 0 || gx >= state.cols || gy < 0 || gy >= state.rows) return;
 
@@ -140,6 +180,11 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
 
   ctx.fillStyle = rgba;
   ctx.fill();
+}
+
+function tileVariantIndex(seed, x, y, count) {
+  const h1 = (seed ^ (x * 374761393) ^ (y * 668265263)) >>> 0;
+  return h1 % count;
 }
 
 function getForwardScreenUnit(state, originX, originY, tileW, tileH) {
