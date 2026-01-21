@@ -1,33 +1,67 @@
 import { DIR_V } from "../core/constants.js";
-import { computeMoveSteps, inBounds, makeBlockedSet, isBlocked } from "../core/rules.js";
+import { computeMoveSteps, inBounds, makeBlockedMap, isBlocked } from "../core/rules.js";
 import { gridToIsoTop, tileCenter, computeGridCorners, computeOrigin } from "./iso.js";
 import { clamp01, lerp } from "../util/math.js";
 
 export class CanvasRenderer {
-  constructor(canvas) {
+  constructor(canvas, assetManager = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
+    this.assetManager = assetManager;
   }
 
-  render({ state, msLeft, lastMoveSteps }) {
+  render({ state, msLeft, lastMoveSteps, map, queuedPreview }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
 
     ctx.clearRect(0, 0, width, height);
+
+    const theme = map?.theme?.assets;
+    const backgroundImage = theme?.background?.image;
+    const bg = backgroundImage ? this.assetManager?.get(backgroundImage) : null;
+    if (bg) {
+      ctx.drawImage(bg, 0, 0, width, height);
+    } else {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+    }
 
     // tile sizing tuned for big canvas
     const tileW = Math.floor(Math.min(width, height) / (state.cols + state.rows) * 1.85);
     const tileH = Math.floor(tileW / 2);
 
     const { originX, originY, pad } = computeOrigin(state, width, height, tileW, tileH);
-    const blockedSet = makeBlockedSet(state.blocked);
+    const blockedMap = makeBlockedMap(state.blocked);
+    const tileVariants = theme?.tiles?.variants ?? [];
+    const blockedKinds = theme?.blocked?.kinds ?? {};
 
     // --- tiles ---
     for (let gy = 0; gy < state.rows; gy++) {
       for (let gx = 0; gx < state.cols; gx++) {
         const { sx, sy } = gridToIsoTop(gx, gy, originX, originY, tileW, tileH);
-        const fill = isBlocked(blockedSet, gx, gy) ? "#000" : (((gx + gy) % 2 === 0) ? "#f2f2f2" : "#fff");
-        drawDiamond(ctx, sx, sy, tileW, tileH, fill);
+        if (tileVariants.length > 0) {
+          const tileIndex = tileVariantIndex(state.mapSeed ?? 0, gx, gy, tileVariants.length);
+          const tileUrl = tileVariants[tileIndex];
+          const tileImage = this.assetManager?.get(tileUrl);
+          if (tileImage) {
+            drawTileImage(ctx, tileImage, sx, sy, tileW, tileH);
+          } else {
+            drawDiamond(ctx, sx, sy, tileW, tileH, "#f2f2f2");
+          }
+        } else {
+          drawDiamond(ctx, sx, sy, tileW, tileH, "#f2f2f2");
+        }
+
+        if (isBlocked(blockedMap, gx, gy)) {
+          const kind = blockedMap.get(`${gx},${gy}`);
+          const blockedUrl = blockedKinds[kind] ?? blockedKinds.fallback;
+          const blockedImage = this.assetManager?.get(blockedUrl);
+          if (blockedImage) {
+            drawTileImage(ctx, blockedImage, sx, sy, tileW, tileH);
+          } else {
+            drawDiamond(ctx, sx, sy, tileW, tileH, "#000");
+          }
+        }
       }
     }
 
@@ -36,14 +70,15 @@ export class CanvasRenderer {
     drawHighlight(ctx, state, state.prev.x, state.prev.y, originX, originY, tileW, tileH, "rgba(0,180,255,0.18)");
 
     // queued target & step1
-    if (state.queuedAction?.type === "move") {
-      const { steps } = computeMoveSteps(state.ship.x, state.ship.y, state.ship.dir, state.queuedAction.move);
+    const pendingAction = queuedPreview ?? state.queuedAction;
+    if (pendingAction?.type === "move") {
+      const { steps } = computeMoveSteps(state.ship.x, state.ship.y, state.ship.dir, pendingAction.move);
 
       if (steps.length === 2) {
         const s1 = steps[0];
         let tint1 = "rgba(255,255,0,0.12)";
         if (!inBounds(state, s1.x, s1.y)) tint1 = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedSet, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
+        else if (isBlocked(blockedMap, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
       }
 
@@ -51,15 +86,26 @@ export class CanvasRenderer {
         const last = steps[steps.length - 1];
         let tint = "rgba(0,255,0,0.18)";
         if (!inBounds(state, last.x, last.y)) tint = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedSet, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
+        else if (isBlocked(blockedMap, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, last.x, last.y, originX, originY, tileW, tileH, tint);
       }
     }
 
-    // --- projectiles (visual only) ---
-    const stillAlive = [];
+    // --- projectile path highlights ---
     for (const p of state.projectiles) {
       const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
+      if (t >= 1) continue;
+      if (!Array.isArray(p.path)) continue;
+      p.path.forEach((tile, idx) => {
+        const tint = idx === 0 ? "rgba(255,140,0,0.25)" : "rgba(255,140,0,0.14)";
+        drawHighlight(ctx, state, tile.x, tile.y, originX, originY, tileW, tileH, tint);
+      });
+    }
+
+    // --- projectiles (visual only) ---
+    for (const p of state.projectiles) {
+      const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
+      if (t >= 1) continue;
       const from = tileCenter(p.fromX, p.fromY, originX, originY, tileW, tileH);
       const to = tileCenter(p.toX, p.toY, originX, originY, tileW, tileH);
 
@@ -70,11 +116,7 @@ export class CanvasRenderer {
       ctx.beginPath();
       ctx.arc(x, y, Math.max(3, tileH * 0.10), 0, Math.PI * 2);
       ctx.fill();
-
-      if (t < 1) stillAlive.push(p);
     }
-    // mutate only render-ephemera is okay (or you can do this in core if you prefer)
-    state.projectiles = stillAlive;
 
     // --- ship ---
     const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
@@ -128,6 +170,12 @@ function drawDiamond(ctx, sx, sy, tileW, tileH, fillStyle) {
   ctx.stroke();
 }
 
+function drawTileImage(ctx, image, sx, sy, tileW, tileH) {
+  const x = sx - tileW / 2;
+  const y = sy;
+  ctx.drawImage(image, x, y, tileW, tileH);
+}
+
 function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba) {
   if (gx < 0 || gx >= state.cols || gy < 0 || gy >= state.rows) return;
 
@@ -144,6 +192,11 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
 
   ctx.fillStyle = rgba;
   ctx.fill();
+}
+
+function tileVariantIndex(seed, x, y, count) {
+  const h1 = (seed ^ (x * 374761393) ^ (y * 668265263)) >>> 0;
+  return h1 % count;
 }
 
 function getForwardScreenUnit(state, originX, originY, tileW, tileH) {
@@ -190,10 +243,28 @@ function drawCompassOutside(ctx, state, originX, originY, tileW, tileH) {
 
   const off = Math.max(18, Math.floor(tileW * 0.22));
 
-  const Np = { x: topCorner.x, y: topCorner.y - off };
-  const Ep = { x: rightCorner.x + off, y: rightCorner.y };
-  const Sp = { x: bottomCorner.x, y: bottomCorner.y + off };
-  const Wp = { x: leftCorner.x - off, y: leftCorner.y };
+  const center = {
+    x: (topCorner.x + rightCorner.x + bottomCorner.x + leftCorner.x) / 4,
+    y: (topCorner.y + rightCorner.y + bottomCorner.y + leftCorner.y) / 4,
+  };
+
+  const edgeMid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const outward = (p) => {
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: p.x + (dx / len) * off, y: p.y + (dy / len) * off };
+  };
+
+  const northEdge = edgeMid(topCorner, rightCorner);
+  const eastEdge = edgeMid(rightCorner, bottomCorner);
+  const southEdge = edgeMid(bottomCorner, leftCorner);
+  const westEdge = edgeMid(leftCorner, topCorner);
+
+  const Np = outward(northEdge);
+  const Ep = outward(eastEdge);
+  const Sp = outward(southEdge);
+  const Wp = outward(westEdge);
 
   ctx.fillStyle = "#000";
   ctx.font = "bold 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
