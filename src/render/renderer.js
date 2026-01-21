@@ -10,7 +10,7 @@ export class CanvasRenderer {
     this.assetManager = assetManager;
   }
 
-  render({ state, msLeft, lastMoveSteps, map }) {
+  render({ state, msLeft, lastMoveSteps, map, queuedPreview }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
 
@@ -70,8 +70,9 @@ export class CanvasRenderer {
     drawHighlight(ctx, state, state.prev.x, state.prev.y, originX, originY, tileW, tileH, "rgba(0,180,255,0.18)");
 
     // queued target & step1
-    if (state.queuedAction?.type === "move") {
-      const { steps } = computeMoveSteps(state.ship.x, state.ship.y, state.ship.dir, state.queuedAction.move);
+    const pendingAction = queuedPreview ?? state.queuedAction;
+    if (pendingAction?.type === "move") {
+      const { steps } = computeMoveSteps(state.ship.x, state.ship.y, state.ship.dir, pendingAction.move);
 
       if (steps.length === 2) {
         const s1 = steps[0];
@@ -88,6 +89,17 @@ export class CanvasRenderer {
         else if (isBlocked(blockedMap, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, last.x, last.y, originX, originY, tileW, tileH, tint);
       }
+    }
+
+    // --- projectile path highlights ---
+    for (const p of state.projectiles) {
+      const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
+      if (t >= 1) continue;
+      if (!Array.isArray(p.path)) continue;
+      p.path.forEach((tile, idx) => {
+        const tint = idx === 0 ? "rgba(255,140,0,0.25)" : "rgba(255,140,0,0.14)";
+        drawHighlight(ctx, state, tile.x, tile.y, originX, originY, tileW, tileH, tint);
+      });
     }
 
     // --- projectiles (visual only) ---

@@ -130,25 +130,37 @@ export function resolveShoot(state, nowMs) {
   const portV = DIR_V[portDir];
   const starV = DIR_V[starDir];
 
-  const portX = next.ship.x + portV.x * 2;
-  const portY = next.ship.y + portV.y * 2;
-  const starX = next.ship.x + starV.x * 2;
-  const starY = next.ship.y + starV.y * 2;
+  const portStep1 = { x: next.ship.x + portV.x, y: next.ship.y + portV.y };
+  const portStep2 = { x: next.ship.x + portV.x * 2, y: next.ship.y + portV.y * 2 };
+  const starStep1 = { x: next.ship.x + starV.x, y: next.ship.y + starV.y };
+  const starStep2 = { x: next.ship.x + starV.x * 2, y: next.ship.y + starV.y * 2 };
 
   const durationMs = 450;
 
-  if (inBounds(next, portX, portY)) {
+  if (inBounds(next, portStep1.x, portStep1.y)) {
+    const path = [portStep1];
+    if (inBounds(next, portStep2.x, portStep2.y)) {
+      path.push(portStep2);
+    }
+    const last = path[path.length - 1];
     next.projectiles.push({
       fromX: next.ship.x, fromY: next.ship.y,
-      toX: portX, toY: portY,
-      spawnTime: nowMs, durationMs
+      toX: last.x, toY: last.y,
+      spawnTime: nowMs, durationMs,
+      path
     });
   }
-  if (inBounds(next, starX, starY)) {
+  if (inBounds(next, starStep1.x, starStep1.y)) {
+    const path = [starStep1];
+    if (inBounds(next, starStep2.x, starStep2.y)) {
+      path.push(starStep2);
+    }
+    const last = path[path.length - 1];
     next.projectiles.push({
       fromX: next.ship.x, fromY: next.ship.y,
-      toX: starX, toY: starY,
-      spawnTime: nowMs, durationMs
+      toX: last.x, toY: last.y,
+      spawnTime: nowMs, durationMs,
+      path
     });
   }
 
