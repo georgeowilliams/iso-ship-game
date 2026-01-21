@@ -13,7 +13,6 @@ const voteCollector = new VoteCollector();
 const assetManager = new AssetManager();
 let currentMap = MAPS[0];
 
-const voteCollector = new VoteCollector();
 
 const engine = new TurnEngine({
   initialState: createInitialState(currentMap),
