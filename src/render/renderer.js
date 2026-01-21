@@ -190,10 +190,28 @@ function drawCompassOutside(ctx, state, originX, originY, tileW, tileH) {
 
   const off = Math.max(18, Math.floor(tileW * 0.22));
 
-  const Np = { x: topCorner.x, y: topCorner.y - off };
-  const Ep = { x: rightCorner.x + off, y: rightCorner.y };
-  const Sp = { x: bottomCorner.x, y: bottomCorner.y + off };
-  const Wp = { x: leftCorner.x - off, y: leftCorner.y };
+  const center = {
+    x: (topCorner.x + rightCorner.x + bottomCorner.x + leftCorner.x) / 4,
+    y: (topCorner.y + rightCorner.y + bottomCorner.y + leftCorner.y) / 4,
+  };
+
+  const edgeMid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  const outward = (p) => {
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: p.x + (dx / len) * off, y: p.y + (dy / len) * off };
+  };
+
+  const northEdge = edgeMid(topCorner, rightCorner);
+  const eastEdge = edgeMid(rightCorner, bottomCorner);
+  const southEdge = edgeMid(bottomCorner, leftCorner);
+  const westEdge = edgeMid(leftCorner, topCorner);
+
+  const Np = outward(northEdge);
+  const Ep = outward(eastEdge);
+  const Sp = outward(southEdge);
+  const Wp = outward(westEdge);
 
   ctx.fillStyle = "#000";
   ctx.font = "bold 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
