@@ -57,9 +57,9 @@ export class CanvasRenderer {
     }
 
     // --- projectiles (visual only) ---
-    const stillAlive = [];
     for (const p of state.projectiles) {
       const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
+      if (t >= 1) continue;
       const from = tileCenter(p.fromX, p.fromY, originX, originY, tileW, tileH);
       const to = tileCenter(p.toX, p.toY, originX, originY, tileW, tileH);
 
@@ -70,11 +70,7 @@ export class CanvasRenderer {
       ctx.beginPath();
       ctx.arc(x, y, Math.max(3, tileH * 0.10), 0, Math.PI * 2);
       ctx.fill();
-
-      if (t < 1) stillAlive.push(p);
     }
-    // mutate only render-ephemera is okay (or you can do this in core if you prefer)
-    state.projectiles = stillAlive;
 
     // --- ship ---
     const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
