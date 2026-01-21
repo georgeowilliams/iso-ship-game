@@ -1,4 +1,4 @@
-import { resolveMove, resolveShoot, resolveNoop } from "./rules.js";
+import { pruneProjectiles, resolveMove, resolveShoot, resolveNoop } from "./rules.js";
 
 /**
  * TurnEngine owns:
@@ -27,6 +27,12 @@ export class TurnEngine {
 
   update() {
     const t = this.now();
+    if (this.state.projectiles.length > 0) {
+      const nextState = pruneProjectiles(this.state, t);
+      if (nextState.projectiles.length !== this.state.projectiles.length) {
+        this.state = nextState;
+      }
+    }
     if (t < this.nextTickAt) return;
 
     // catch-up without drift

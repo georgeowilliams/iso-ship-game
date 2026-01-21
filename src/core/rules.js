@@ -157,6 +157,17 @@ export function resolveNoop(state) {
   return { nextState: next, outcome: { reason: "noop_tick" } };
 }
 
+/**
+ * Remove expired projectiles from state (visual-only cleanup).
+ */
+export function pruneProjectiles(state, nowMs) {
+  const next = structuredCloneLite(state);
+  next.projectiles = next.projectiles.filter(
+    (p) => nowMs - p.spawnTime < p.durationMs
+  );
+  return next;
+}
+
 // --- tiny local clone utility (fast and safe for this state shape) ---
 function structuredCloneLite(s) {
   return {
