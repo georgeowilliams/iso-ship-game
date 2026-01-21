@@ -1,22 +1,35 @@
-export function installKeyboard({ onAction }) {
-  window.addEventListener("keydown", (e) => {
-    const k = e.key.toLowerCase();
+export function createKeyboardAdapter({ userId = "local" } = {}) {
+  let handler = null;
 
-    // no backward anymore
-    const prevent = ["arrowup", "arrowleft", "arrowright", " ", "w", "a", "d"];
-    if (prevent.includes(k)) e.preventDefault();
+  return {
+    start(onVote) {
+      if (handler) return;
+      handler = (e) => {
+        const k = e.key.toLowerCase();
 
-    if (k === "w" || k === "arrowup") {
-      onAction({ type: "move", move: "F", label: "MOVE: FORWARD" });
-    }
-    if (k === "a" || k === "arrowleft") {
-      onAction({ type: "move", move: "L", label: "MOVE: FORWARD+LEFT" });
-    }
-    if (k === "d" || k === "arrowright") {
-      onAction({ type: "move", move: "R", label: "MOVE: FORWARD+RIGHT" });
-    }
-    if (k === " ") {
-      onAction({ type: "shoot", label: "SHOOT (PORT+STARBOARD)" });
-    }
-  });
+        // no backward anymore
+        const prevent = ["arrowup", "arrowleft", "arrowright", " ", "w", "a", "d"];
+        if (prevent.includes(k)) e.preventDefault();
+
+        if (k === "w" || k === "arrowup") {
+          onVote({ userId, choice: "F" });
+        }
+        if (k === "a" || k === "arrowleft") {
+          onVote({ userId, choice: "L" });
+        }
+        if (k === "d" || k === "arrowright") {
+          onVote({ userId, choice: "R" });
+        }
+        if (k === " ") {
+          onVote({ userId, choice: "SHOOT" });
+        }
+      };
+      window.addEventListener("keydown", handler);
+    },
+    stop() {
+      if (!handler) return;
+      window.removeEventListener("keydown", handler);
+      handler = null;
+    },
+  };
 }

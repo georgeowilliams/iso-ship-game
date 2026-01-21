@@ -5,12 +5,17 @@ export function inBounds(state, x, y) {
   return x >= 0 && x < state.cols && y >= 0 && y < state.rows;
 }
 
-export function makeBlockedSet(blocked) {
-  return new Set(blocked.map(([x, y]) => `${x},${y}`));
+export function makeBlockedMap(blocked) {
+  return new Map(blocked.map(({ x, y, kind }) => [`${x},${y}`, kind ?? "rock"]));
 }
 
-export function isBlocked(blockedSet, x, y) {
-  return blockedSet.has(`${x},${y}`);
+export function isBlocked(blockedMap, x, y) {
+  return blockedMap.has(`${x},${y}`);
+}
+
+export function blockedDamage(kind) {
+  if (kind === "wall") return 0;
+  return 1;
 }
 
 /**
@@ -61,7 +66,7 @@ export function resolveMove(state, move, nowMs) {
   // requirement: on any move attempt (success/fail), prev becomes current tile
   next.prev = { x: next.ship.x, y: next.ship.y };
 
-  const blockedSet = makeBlockedSet(next.blocked);
+  const blockedMap = makeBlockedMap(next.blocked);
 
   const { newDir, steps } = computeMoveSteps(next.ship.x, next.ship.y, next.ship.dir, move);
 
@@ -83,12 +88,16 @@ export function resolveMove(state, move, nowMs) {
         outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
       };
     }
-    if (isBlocked(blockedSet, s.x, s.y)) {
-      next.ship.hp = Math.max(0, next.ship.hp - 1);
-      next.lastDamageAt = nowMs;
+    if (isBlocked(blockedMap, s.x, s.y)) {
+      const kind = blockedMap.get(`${s.x},${s.y}`);
+      const damage = blockedDamage(kind);
+      if (damage > 0) {
+        next.ship.hp = Math.max(0, next.ship.hp - damage);
+        next.lastDamageAt = nowMs;
+      }
       return {
         nextState: next,
-        outcome: { moved: false, damaged: true, damage: 1, reason: "blocked", steps }
+        outcome: { moved: false, damaged: damage > 0, damage, reason: "blocked", steps }
       };
     }
   }
@@ -157,13 +166,24 @@ export function resolveNoop(state) {
   return { nextState: next, outcome: { reason: "noop_tick" } };
 }
 
+/**
+ * Remove expired projectiles from state (visual-only cleanup).
+ */
+export function pruneProjectiles(state, nowMs) {
+  const next = structuredCloneLite(state);
+  next.projectiles = next.projectiles.filter(
+    (p) => nowMs - p.spawnTime < p.durationMs
+  );
+  return next;
+}
+
 // --- tiny local clone utility (fast and safe for this state shape) ---
 function structuredCloneLite(s) {
   return {
     ...s,
     ship: { ...s.ship },
     prev: { ...s.prev },
-    blocked: s.blocked.map(p => [p[0], p[1]]),
+    blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
   };

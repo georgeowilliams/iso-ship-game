@@ -1,9 +1,26 @@
 import { DIR } from "./constants.js";
 
-export function createInitialState() {
+export function createInitialState(mapDef) {
+  if (mapDef) {
+    return {
+      rows: mapDef.grid.rows,
+      cols: mapDef.grid.cols,
+      mapId: mapDef.id,
+      mapSeed: mapDef.seed,
+      ship: { ...mapDef.spawn },
+      blocked: mapDef.blocked.map((b) => ({ ...b })),
+      prev: { x: mapDef.spawn.x, y: mapDef.spawn.y },
+      queuedAction: null,
+      projectiles: [],
+      lastDamageAt: 0,
+    };
+  }
+
   return {
     rows: 7,
     cols: 7,
+    mapId: "default",
+    mapSeed: 0,
 
     ship: {
       x: 3,
@@ -14,11 +31,11 @@ export function createInitialState() {
     },
 
     blocked: [
-      [1, 1],
-      [2, 1],
-      [5, 2],
-      [3, 4],
-      [4, 4],
+      { x: 1, y: 1, kind: "rock" },
+      { x: 2, y: 1, kind: "rock" },
+      { x: 5, y: 2, kind: "reef" },
+      { x: 3, y: 4, kind: "wall" },
+      { x: 4, y: 4, kind: "wall" },
     ],
 
     // highlight of previous tile
@@ -41,7 +58,7 @@ export function cloneState(s) {
     ...s,
     ship: { ...s.ship },
     prev: { ...s.prev },
-    blocked: s.blocked.map(p => [p[0], p[1]]),
+    blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
   };
