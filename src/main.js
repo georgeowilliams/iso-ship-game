@@ -32,6 +32,41 @@ keyboard.start((vote) => {
   queuedPreview = voteToPreviewAction(vote.choice);
   voteCollector.addVote(vote);
 });
+keyboard.start((vote) => voteCollector.addVote(vote));
+
+if (mapSelect) {
+  for (const map of MAPS) {
+    const option = document.createElement("option");
+    option.value = map.id;
+    option.textContent = map.name;
+    mapSelect.appendChild(option);
+  }
+  mapSelect.value = currentMap.id;
+  mapSelect.addEventListener("change", () => {
+    currentMap = getMapById(mapSelect.value);
+    engine.loadMap(currentMap);
+    preloadMapAssets(currentMap);
+  });
+}
+
+preloadMapAssets(currentMap);
+
+if (mapSelect) {
+  for (const map of MAPS) {
+    const option = document.createElement("option");
+    option.value = map.id;
+    option.textContent = map.name;
+    mapSelect.appendChild(option);
+  }
+  mapSelect.value = currentMap.id;
+  mapSelect.addEventListener("change", () => {
+    currentMap = getMapById(mapSelect.value);
+    engine.loadMap(currentMap);
+    preloadMapAssets(currentMap);
+  });
+}
+
+preloadMapAssets(currentMap);
 
 if (mapSelect) {
   for (const map of maps) {
