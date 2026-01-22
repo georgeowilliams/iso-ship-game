@@ -1,28 +1,33 @@
 import { DIR } from "./constants.js";
+import { getMapById } from "../maps/maps.js";
 
-export function createInitialState() {
+export function createInitialState(mapId) {
+  const mapDef = getMapById(mapId);
+  const hazardDamageByKey = {};
+  (mapDef.hazards ?? []).forEach((hazard) => {
+    hazardDamageByKey[`${hazard.x},${hazard.y}`] = hazard.damage;
+  });
+
   return {
-    rows: 7,
-    cols: 7,
-
+    rows: mapDef.grid.rows,
+    cols: mapDef.grid.cols,
+    mapId: mapDef.id,
+    mapSeed: mapDef.seed,
+    theme: mapDef.theme,
     ship: {
-      x: 3,
-      y: 3,
-      dir: DIR.N,
-      hp: 3,
-      ammo: 15,
+      x: mapDef.spawn.x,
+      y: mapDef.spawn.y,
+      dir: mapDef.spawn.dir ?? DIR.N,
+      hp: mapDef.spawn.hp,
+      ammo: mapDef.spawn.ammo,
     },
-
-    blocked: [
-      [1, 1],
-      [2, 1],
-      [5, 2],
-      [3, 4],
-      [4, 4],
-    ],
+    blocked: mapDef.blocked.map((b) => ({ ...b })),
+    hazards: mapDef.hazards ? mapDef.hazards.map((h) => ({ ...h })) : [],
+    hazardDamageByKey,
+    mode: "playing",
 
     // highlight of previous tile
-    prev: { x: 3, y: 3 },
+    prev: { x: mapDef.spawn.x, y: mapDef.spawn.y },
 
     // queued action from any input adapter
     // { type: "move", move: "F"|"L"|"R" }
@@ -41,7 +46,7 @@ export function cloneState(s) {
     ...s,
     ship: { ...s.ship },
     prev: { ...s.prev },
-    blocked: s.blocked.map(p => [p[0], p[1]]),
+    blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
   };
