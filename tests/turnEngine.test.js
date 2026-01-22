@@ -44,4 +44,48 @@ describe("TurnEngine voting integration", () => {
     expect(engine.lastOutcome?.moved).toBe(true);
     expect(voteCollector.resolveWinner()).toBe(null);
   });
+
+  it("applies hazard damage after successful movement only", () => {
+    const voteCollector = new VoteCollector();
+    let t = 0;
+    const engine = new TurnEngine({
+      initialState: createInitialState("islands"),
+      turnMs: 2000,
+      now: () => t,
+      voteCollector,
+    });
+
+    engine.state.ship.x = 0;
+    engine.state.ship.y = 3;
+    engine.state.ship.dir = 1;
+    engine.queueAction({ type: "move", move: "F", label: "MOVE: FORWARD" });
+    t = 2001;
+    engine.update();
+    expect(engine.state.ship.hp).toBe(2);
+
+    engine.queueAction({ type: "move", move: "F", label: "MOVE: FORWARD" });
+    t = 4002;
+    engine.update();
+    expect(engine.state.ship.hp).toBe(2);
+  });
+
+  it("enters game over when hazard reduces HP to zero", () => {
+    const voteCollector = new VoteCollector();
+    let t = 0;
+    const engine = new TurnEngine({
+      initialState: createInitialState("islands"),
+      turnMs: 2000,
+      now: () => t,
+      voteCollector,
+    });
+
+    engine.state.ship.hp = 1;
+    engine.state.ship.x = 4;
+    engine.state.ship.y = 3;
+    engine.state.ship.dir = 1;
+    engine.queueAction({ type: "move", move: "F", label: "MOVE: FORWARD" });
+    t = 2001;
+    engine.update();
+    expect(engine.state.mode).toBe("gameOver");
+  });
 });

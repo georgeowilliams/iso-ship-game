@@ -31,8 +31,18 @@ export const MAPS = [
             fallback: "/assets/islands/blocked/fallback.txt",
           },
         },
+        ship: {
+          N: "/assets/islands/ship/ship_N.txt",
+          E: "/assets/islands/ship/ship_E.txt",
+          S: "/assets/islands/ship/ship_S.txt",
+          W: "/assets/islands/ship/ship_W.txt",
+        },
       },
     },
+    hazards: [
+      { x: 1, y: 3, damage: 1, kind: "reef" },
+      { x: 5, y: 3, damage: 2, kind: "reef" },
+    ],
   },
   {
     id: "ice",
@@ -66,8 +76,18 @@ export const MAPS = [
             fallback: "/assets/ice/blocked/fallback.txt",
           },
         },
+        ship: {
+          N: "/assets/ice/ship/ship_N.txt",
+          E: "/assets/ice/ship/ship_E.txt",
+          S: "/assets/ice/ship/ship_S.txt",
+          W: "/assets/ice/ship/ship_W.txt",
+        },
       },
     },
+    hazards: [
+      { x: 2, y: 2, damage: 1, kind: "ice" },
+      { x: 4, y: 5, damage: 2, kind: "ice" },
+    ],
   },
   {
     id: "desert",
@@ -101,10 +121,24 @@ export const MAPS = [
             fallback: "/assets/desert/blocked/fallback.txt",
           },
         },
+        ship: {
+          N: "/assets/desert/ship/ship_N.txt",
+          E: "/assets/desert/ship/ship_E.txt",
+          S: "/assets/desert/ship/ship_S.txt",
+          W: "/assets/desert/ship/ship_W.txt",
+        },
       },
     },
+    hazards: [
+      { x: 2, y: 4, damage: 1, kind: "sand" },
+      { x: 4, y: 1, damage: 2, kind: "sand" },
+    ],
   },
 ];
+
+export function getAllMaps() {
+  return [...MAPS];
+}
 
 export function getMapById(id) {
   return MAPS.find((map) => map.id === id) ?? MAPS[0];

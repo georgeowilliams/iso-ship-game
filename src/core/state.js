@@ -1,45 +1,33 @@
 import { DIR } from "./constants.js";
+import { getMapById } from "../maps/maps.js";
 
-export function createInitialState(mapDef) {
-  if (mapDef) {
-    return {
-      rows: mapDef.grid.rows,
-      cols: mapDef.grid.cols,
-      mapId: mapDef.id,
-      mapSeed: mapDef.seed,
-      ship: { ...mapDef.spawn },
-      blocked: mapDef.blocked.map((b) => ({ ...b })),
-      prev: { x: mapDef.spawn.x, y: mapDef.spawn.y },
-      queuedAction: null,
-      projectiles: [],
-      lastDamageAt: 0,
-    };
-  }
+export function createInitialState(mapId) {
+  const mapDef = getMapById(mapId);
+  const hazardDamageByKey = {};
+  (mapDef.hazards ?? []).forEach((hazard) => {
+    hazardDamageByKey[`${hazard.x},${hazard.y}`] = hazard.damage;
+  });
 
   return {
-    rows: 7,
-    cols: 7,
-    mapId: "default",
-    mapSeed: 0,
-
+    rows: mapDef.grid.rows,
+    cols: mapDef.grid.cols,
+    mapId: mapDef.id,
+    mapSeed: mapDef.seed,
+    theme: mapDef.theme,
     ship: {
-      x: 3,
-      y: 3,
-      dir: DIR.N,
-      hp: 3,
-      ammo: 15,
+      x: mapDef.spawn.x,
+      y: mapDef.spawn.y,
+      dir: mapDef.spawn.dir ?? DIR.N,
+      hp: mapDef.spawn.hp,
+      ammo: mapDef.spawn.ammo,
     },
-
-    blocked: [
-      { x: 1, y: 1, kind: "rock" },
-      { x: 2, y: 1, kind: "rock" },
-      { x: 5, y: 2, kind: "reef" },
-      { x: 3, y: 4, kind: "wall" },
-      { x: 4, y: 4, kind: "wall" },
-    ],
+    blocked: mapDef.blocked.map((b) => ({ ...b })),
+    hazards: mapDef.hazards ? mapDef.hazards.map((h) => ({ ...h })) : [],
+    hazardDamageByKey,
+    mode: "playing",
 
     // highlight of previous tile
-    prev: { x: 3, y: 3 },
+    prev: { x: mapDef.spawn.x, y: mapDef.spawn.y },
 
     // queued action from any input adapter
     // { type: "move", move: "F"|"L"|"R" }

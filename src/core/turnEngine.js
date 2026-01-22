@@ -29,6 +29,7 @@ export class TurnEngine {
 
   update() {
     const t = this.now();
+    if (this.state.mode && this.state.mode !== "playing") return;
     if (this.state.projectiles.length > 0) {
       const nextState = pruneProjectiles(this.state, t);
       if (nextState.projectiles.length !== this.state.projectiles.length) {
@@ -60,6 +61,9 @@ export class TurnEngine {
     if (action.type === "move") {
       const { nextState, outcome } = resolveMove(this.state, action.move, t);
       this.state = { ...nextState, queuedAction: null };
+      if (outcome.moved) {
+        this.applyHazardDamage();
+      }
       this.lastOutcome = outcome;
       this.lastMoveSteps = outcome.steps || null;
       if (this.voteCollector) this.voteCollector.reset();
@@ -95,9 +99,20 @@ export class TurnEngine {
   }
 
   loadMap(mapDef) {
-    this.state = createInitialState(mapDef);
+    this.state = createInitialState(mapDef?.id ?? mapDef);
     this.nextTickAt = this.now() + this.turnMs;
     this.lastOutcome = null;
     this.lastMoveSteps = null;
+  }
+
+  applyHazardDamage() {
+    const key = `${this.state.ship.x},${this.state.ship.y}`;
+    const damage = this.state.hazardDamageByKey?.[key] ?? 0;
+    if (damage > 0) {
+      this.state.ship.hp = Math.max(0, this.state.ship.hp - damage);
+      if (this.state.ship.hp === 0) {
+        this.state.mode = "gameOver";
+      }
+    }
   }
 }

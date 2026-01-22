@@ -16,7 +16,7 @@ export class CanvasRenderer {
 
     ctx.clearRect(0, 0, width, height);
 
-    const theme = map?.theme?.assets;
+    const theme = state.theme?.assets ?? map?.theme?.assets;
     const backgroundImage = theme?.background?.image;
     const bg = backgroundImage ? this.assetManager?.get(backgroundImage) : null;
     if (bg) {
@@ -121,16 +121,23 @@ export class CanvasRenderer {
     // --- ship ---
     const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
     const r = Math.max(10, tileH * 0.30);
+    const dirKey = ["N", "E", "S", "W"][state.ship.dir] ?? "N";
+    const shipSprite = theme?.ship?.[dirKey];
+    const shipImage = shipSprite ? this.assetManager?.get(shipSprite) : null;
 
-    const flash = (performance.now() - state.lastDamageAt) < 220;
-    ctx.fillStyle = flash ? "#5a0c0c" : "#111";
-    ctx.beginPath();
-    ctx.arc(shipC.x, shipC.y, r, 0, Math.PI * 2);
-    ctx.fill();
+    if (shipImage) {
+      drawShipSprite(ctx, shipImage, shipC.x, shipC.y, tileW, tileH);
+    } else {
+      const flash = (performance.now() - state.lastDamageAt) < 220;
+      ctx.fillStyle = flash ? "#5a0c0c" : "#111";
+      ctx.beginPath();
+      ctx.arc(shipC.x, shipC.y, r, 0, Math.PI * 2);
+      ctx.fill();
 
-    // pointer triangle BLACK, iso-correct (uses projected forward tile direction)
-    const f = getForwardScreenUnit(state, originX, originY, tileW, tileH);
-    drawPointer(ctx, shipC.x, shipC.y, r, f.dx, f.dy);
+      // pointer triangle BLACK, iso-correct (uses projected forward tile direction)
+      const f = getForwardScreenUnit(state, originX, originY, tileW, tileH);
+      drawPointer(ctx, shipC.x, shipC.y, r, f.dx, f.dy);
+    }
 
     // compass outside corners
     drawCompassOutside(ctx, state, originX, originY, tileW, tileH, pad);
@@ -174,6 +181,14 @@ function drawTileImage(ctx, image, sx, sy, tileW, tileH) {
   const x = sx - tileW / 2;
   const y = sy;
   ctx.drawImage(image, x, y, tileW, tileH);
+}
+
+function drawShipSprite(ctx, image, cx, cy, tileW, tileH) {
+  const w = tileW * 0.9;
+  const h = tileH * 0.9;
+  const x = cx - w / 2;
+  const y = cy - h / 2;
+  ctx.drawImage(image, x, y, w, h);
 }
 
 function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba) {
