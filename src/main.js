@@ -30,6 +30,7 @@ const renderer = new CanvasRenderer(canvas, assetManager);
 // Input adapter: keyboard -> votes
 const keyboard = createKeyboardAdapter({ userId: "local" });
 const ACTION_CHOICES = ["FORWARD", "LEFT", "RIGHT", "SHOOT"];
+const ACTION_PRIORITY = ["FORWARD", "LEFT", "RIGHT", "SHOOT"];
 const voteStats = {
   countsByAction: Object.fromEntries(ACTION_CHOICES.map((action) => [action, 0])),
   votesByUser: new Map(),
@@ -45,9 +46,8 @@ keyboard.start((vote) => {
   const actionChoice = normalizeVoteChoice(vote.choice);
   if (!actionChoice) return;
 
-  queuedActionLabel = actionChoice;
-  queuedPreview = voteToPreviewAction(actionChoice);
   updateVoteStats({ userId: vote.userId, action: actionChoice, weight: vote.weight ?? 1 });
+  updateQueuedFromVotes();
 
   const internalChoice = actionToInternalChoice(actionChoice);
   if (!internalChoice) return;
@@ -163,6 +163,25 @@ function updateVoteStats({ userId, action, weight }) {
   voteStats.votesByUser.set(userId, { action, weight });
   voteStats.countsByAction[action] += weight;
   voteStats.totalVotes += weight;
+}
+
+function getLeadingAction(countsByAction) {
+  let best = null;
+  let bestScore = 0;
+  for (const action of ACTION_PRIORITY) {
+    const score = countsByAction[action] ?? 0;
+    if (score > bestScore) {
+      best = action;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function updateQueuedFromVotes() {
+  const leadingAction = getLeadingAction(voteStats.countsByAction);
+  queuedActionLabel = leadingAction;
+  queuedPreview = voteToPreviewAction(leadingAction);
 }
 
 function getVoteStatsSummary() {
