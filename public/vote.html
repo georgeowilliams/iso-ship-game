@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iso Ship Game - Vote</title>
+    <link rel="stylesheet" href="/vote.css" />
+  </head>
+  <body>
+    <main class="vote-card">
+      <h1>Vote Console</h1>
+      <div id="vote-message" class="notice">Connecting…</div>
+      <div class="vote-meta">
+        <div>Voter: <strong id="voter-name">-</strong></div>
+        <div>Turn: <strong id="vote-turn">1</strong></div>
+        <div>Status: <strong id="vote-phase">Voting</strong></div>
+        <div>Countdown: <strong id="vote-countdown">0.0s</strong></div>
+      </div>
+      <div class="vote-buttons">
+        <button data-action="FORWARD">FORWARD</button>
+        <button data-action="LEFT">LEFT</button>
+        <button data-action="RIGHT">RIGHT</button>
+        <button data-action="SHOOT">SHOOT</button>
+      </div>
+      <div class="vote-summary">
+        <div>Forward: <span id="vote-forward">0</span></div>
+        <div>Left: <span id="vote-left">0</span></div>
+        <div>Right: <span id="vote-right">0</span></div>
+        <div>Shoot: <span id="vote-shoot">0</span></div>
+        <div>Participants: <span id="vote-participants">0</span></div>
+        <div>Queued: <span id="vote-queued">none</span></div>
+      </div>
+      <div class="notice">Use <code>?name=alice</code> in the URL to simulate unique voters.</div>
+    </main>
+    <script type="module" src="/src/client/vote.js"></script>
+  </body>
+</html>
