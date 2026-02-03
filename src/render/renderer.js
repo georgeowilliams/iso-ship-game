@@ -69,7 +69,7 @@ export class CanvasRenderer {
     // --- highlights ---
     const previousTileTint = "rgba(0,180,255,0.18)";
     const jumpTileTint = "rgba(0,180,255,0.18)";
-    const edgeLandingTint = "rgba(255,215,0,0.22)";
+    const queuedDestinationTint = "rgba(0,255,0,0.18)";
 
     // previous tiles
     if (state.playerPrev) {
@@ -94,7 +94,7 @@ export class CanvasRenderer {
         originY,
         tileW,
         tileH,
-        edgeLandingTint
+        queuedDestinationTint
       );
     }
     if (state.lastEdgeSlideLandingEnemy) {
@@ -107,7 +107,7 @@ export class CanvasRenderer {
         originY,
         tileW,
         tileH,
-        edgeLandingTint
+        queuedDestinationTint
       );
     }
 
@@ -115,6 +115,7 @@ export class CanvasRenderer {
     const pendingAction = queuedPreview ?? state.queuedAction;
     if (pendingAction?.type === "move") {
       const { steps } = computeMoveSteps(state.ship.x, state.ship.y, state.ship.dir, pendingAction.move);
+      const queuedDestination = resolveQueuedDestination(state, steps);
 
       if (steps.length === 2) {
         const s1 = steps[0];
@@ -124,12 +125,20 @@ export class CanvasRenderer {
         drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
       }
 
-      if (steps.length >= 1) {
-        const last = steps[steps.length - 1];
-        let tint = "rgba(0,255,0,0.18)";
-        if (!inBounds(state, last.x, last.y)) tint = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedMap, last.x, last.y)) tint = "rgba(255,0,0,0.20)";
-        drawHighlight(ctx, state, last.x, last.y, originX, originY, tileW, tileH, tint);
+      if (queuedDestination) {
+        let tint = queuedDestinationTint;
+        if (isBlocked(blockedMap, queuedDestination.x, queuedDestination.y)) tint = "rgba(255,0,0,0.20)";
+        drawHighlight(
+          ctx,
+          state,
+          queuedDestination.x,
+          queuedDestination.y,
+          originX,
+          originY,
+          tileW,
+          tileH,
+          tint
+        );
       }
     }
 
@@ -326,6 +335,33 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
 
   ctx.fillStyle = rgba;
   ctx.fill();
+}
+
+function resolveQueuedDestination(state, steps) {
+  if (!Array.isArray(steps) || steps.length === 0) return null;
+
+  if (steps.length === 1) {
+    const target = steps[0];
+    if (!inBounds(state, target.x, target.y)) {
+      return { x: state.ship.x, y: state.ship.y };
+    }
+    return target;
+  }
+
+  const corner = steps[0];
+  const final = steps[1];
+  if (!inBounds(state, corner.x, corner.y)) {
+    return {
+      x: clamp(final.x, 0, state.cols - 1),
+      y: clamp(final.y, 0, state.rows - 1),
+    };
+  }
+
+  return final;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function getAnimatedShipPose(ship, nowMs) {
