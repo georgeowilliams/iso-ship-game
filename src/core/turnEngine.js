@@ -76,19 +76,21 @@ export class TurnEngine {
       const { nextState, outcome } = resolveMove(this.state, action.move, t);
       const moved = outcome.moved
         && (playerBefore.x !== nextState.ship.x || playerBefore.y !== nextState.ship.y);
-      if (moved) {
-        nextState.ship.prevX = playerBefore.x;
-        nextState.ship.prevY = playerBefore.y;
+      const animPathTiles = outcome.animPathTiles
+        ?? (outcome.steps?.length ? [playerBefore, ...(outcome.steps ?? [])] : null);
+      if (animPathTiles?.length >= 2) {
         nextState.ship.movedAtMs = t;
-        nextState.ship.animPathTiles = [playerBefore, ...(outcome.steps ?? [])];
-        if (outcome.steps?.length === 2) {
-          nextState.ship.animDirs = [playerDirBefore, nextState.ship.dir];
-        } else {
-          nextState.ship.animDirs = [nextState.ship.dir];
-        }
+        nextState.ship.animPathTiles = animPathTiles;
+        nextState.ship.animDirs = outcome.animDirs ?? (outcome.steps?.length === 2
+          ? [playerDirBefore, nextState.ship.dir]
+          : [nextState.ship.dir]);
       } else {
         nextState.ship.animPathTiles = null;
         nextState.ship.animDirs = null;
+      }
+      if (moved) {
+        nextState.ship.prevX = playerBefore.x;
+        nextState.ship.prevY = playerBefore.y;
       }
       this.state = {
         ...nextState,
@@ -187,19 +189,21 @@ export class TurnEngine {
       const { nextState, outcome } = resolveEnemyMove(this.state, action.move, nowMs);
       const moved = outcome.moved
         && (enemyBefore.x !== nextState.enemy.x || enemyBefore.y !== nextState.enemy.y);
-      if (moved) {
-        nextState.enemy.prevX = enemyBefore.x;
-        nextState.enemy.prevY = enemyBefore.y;
+      const animPathTiles = outcome.animPathTiles
+        ?? (outcome.steps?.length ? [enemyBefore, ...(outcome.steps ?? [])] : null);
+      if (animPathTiles?.length >= 2) {
         nextState.enemy.movedAtMs = nowMs;
-        nextState.enemy.animPathTiles = [enemyBefore, ...(outcome.steps ?? [])];
-        if (outcome.steps?.length === 2) {
-          nextState.enemy.animDirs = [enemyDirBefore, nextState.enemy.dir];
-        } else {
-          nextState.enemy.animDirs = [nextState.enemy.dir];
-        }
+        nextState.enemy.animPathTiles = animPathTiles;
+        nextState.enemy.animDirs = outcome.animDirs ?? (outcome.steps?.length === 2
+          ? [enemyDirBefore, nextState.enemy.dir]
+          : [nextState.enemy.dir]);
       } else {
         nextState.enemy.animPathTiles = null;
         nextState.enemy.animDirs = null;
+      }
+      if (moved) {
+        nextState.enemy.prevX = enemyBefore.x;
+        nextState.enemy.prevY = enemyBefore.y;
       }
       this.state = {
         ...nextState,

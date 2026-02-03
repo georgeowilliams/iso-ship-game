@@ -66,51 +66,15 @@ export function resolveMove(state, move, nowMs) {
   // requirement: on any move attempt (success/fail), prev becomes current tile
   next.prev = { x: next.ship.x, y: next.ship.y };
 
-  const blockedMap = makeBlockedMap(next.blocked);
+  const resolution = resolveMoveForShip({
+    state: next,
+    shipKey: "ship",
+    otherKey: "enemy",
+    move,
+    nowMs,
+  });
 
-  const { newDir, steps } = computeMoveSteps(next.ship.x, next.ship.y, next.ship.dir, move);
-
-  // rotate on intent even if fail
-  next.ship.dir = newDir;
-
-  if (steps.length === 0) {
-    return {
-      nextState: next,
-      outcome: { moved: false, damaged: false, damage: 0, reason: "noop", steps }
-    };
-  }
-
-  // path check (prevents moving through blocked on L/R)
-  for (const s of steps) {
-    if (!inBounds(next, s.x, s.y)) {
-      return {
-        nextState: next,
-        outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
-      };
-    }
-    if (isBlocked(blockedMap, s.x, s.y)) {
-      const kind = blockedMap.get(`${s.x},${s.y}`);
-      const damage = blockedDamage(kind);
-      if (damage > 0) {
-        next.ship.hp = Math.max(0, next.ship.hp - damage);
-        next.lastDamageAt = nowMs;
-      }
-      return {
-        nextState: next,
-        outcome: { moved: false, damaged: damage > 0, damage, reason: "blocked", steps }
-      };
-    }
-  }
-
-  // success lands on final step
-  const last = steps[steps.length - 1];
-  next.ship.x = last.x;
-  next.ship.y = last.y;
-
-  return {
-    nextState: next,
-    outcome: { moved: true, damaged: false, damage: 0, reason: "ok", steps }
-  };
+  return resolution;
 }
 
 /**
@@ -118,11 +82,25 @@ export function resolveMove(state, move, nowMs) {
  */
 export function resolveEnemyMove(state, move, nowMs) {
   const next = structuredCloneLite(state);
+  return resolveMoveForShip({
+    state: next,
+    shipKey: "enemy",
+    otherKey: "ship",
+    move,
+    nowMs,
+  });
+}
 
+function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
+  const next = state;
+  const ship = next[shipKey];
+  const other = next[otherKey];
   const blockedMap = makeBlockedMap(next.blocked);
-  const ship = next.enemy;
+  const start = { x: ship.x, y: ship.y };
+  const dirBefore = ship.dir;
   const { newDir, steps } = computeMoveSteps(ship.x, ship.y, ship.dir, move);
 
+  // rotate on intent even if fail
   ship.dir = newDir;
 
   if (steps.length === 0) {
@@ -132,34 +110,137 @@ export function resolveEnemyMove(state, move, nowMs) {
     };
   }
 
-  for (const s of steps) {
-    if (!inBounds(next, s.x, s.y)) {
-      return {
-        nextState: next,
-        outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
-      };
+  const damageShip = (damage) => {
+    if (damage <= 0) return;
+    ship.hp = Math.max(0, ship.hp - damage);
+    if (shipKey === "ship") {
+      next.lastDamageAt = nowMs;
+    } else {
+      ship.lastDamageAt = nowMs;
     }
-    if (isBlocked(blockedMap, s.x, s.y)) {
-      const kind = blockedMap.get(`${s.x},${s.y}`);
-      const damage = blockedDamage(kind);
-      if (damage > 0) {
-        ship.hp = Math.max(0, ship.hp - damage);
-        ship.lastDamageAt = nowMs;
+  };
+
+  const bounceToStart = (target, damage, reason) => {
+    damageShip(damage);
+    return {
+      nextState: next,
+      outcome: {
+        moved: false,
+        damaged: damage > 0,
+        damage,
+        reason,
+        steps,
+        animPathTiles: [start, target, start],
+        animDirs: [dirBefore, ship.dir],
       }
-      return {
-        nextState: next,
-        outcome: { moved: false, damaged: damage > 0, damage, reason: "blocked", steps }
-      };
-    }
+    };
+  };
+
+  const corner = steps[0];
+
+  if (!inBounds(next, corner.x, corner.y)) {
+    return {
+      nextState: next,
+      outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
+    };
   }
 
-  const last = steps[steps.length - 1];
-  ship.x = last.x;
-  ship.y = last.y;
+  if (corner.x === other.x && corner.y === other.y) {
+    return bounceToStart(corner, 1, "collision");
+  }
+
+  if (isBlocked(blockedMap, corner.x, corner.y)) {
+    const kind = blockedMap.get(`${corner.x},${corner.y}`);
+    const damage = blockedDamage(kind);
+    return bounceToStart(corner, damage, "blocked");
+  }
+
+  if (steps.length === 1) {
+    ship.x = corner.x;
+    ship.y = corner.y;
+    return {
+      nextState: next,
+      outcome: {
+        moved: true,
+        damaged: false,
+        damage: 0,
+        reason: "ok",
+        steps,
+        animPathTiles: [start, corner],
+        animDirs: [ship.dir],
+      }
+    };
+  }
+
+  const final = steps[1];
+
+  if (!inBounds(next, final.x, final.y)) {
+    ship.x = corner.x;
+    ship.y = corner.y;
+    return {
+      nextState: next,
+      outcome: {
+        moved: true,
+        damaged: false,
+        damage: 0,
+        reason: "corner_oob",
+        steps,
+        animPathTiles: [start, corner, final, corner],
+        animDirs: [dirBefore, ship.dir, ship.dir],
+      }
+    };
+  }
+
+  if (final.x === other.x && final.y === other.y) {
+    damageShip(1);
+    ship.x = corner.x;
+    ship.y = corner.y;
+    return {
+      nextState: next,
+      outcome: {
+        moved: true,
+        damaged: true,
+        damage: 1,
+        reason: "collision",
+        steps,
+        animPathTiles: [start, corner, final, corner],
+        animDirs: [dirBefore, ship.dir, ship.dir],
+      }
+    };
+  }
+
+  if (isBlocked(blockedMap, final.x, final.y)) {
+    damageShip(1);
+    ship.x = corner.x;
+    ship.y = corner.y;
+    return {
+      nextState: next,
+      outcome: {
+        moved: true,
+        damaged: true,
+        damage: 1,
+        reason: "blocked",
+        steps,
+        animPathTiles: [start, corner, final, corner],
+        animDirs: [dirBefore, ship.dir, ship.dir],
+      }
+    };
+  }
+
+  ship.x = final.x;
+  ship.y = final.y;
 
   return {
     nextState: next,
-    outcome: { moved: true, damaged: false, damage: 0, reason: "ok", steps }
+    outcome: {
+      moved: true,
+      damaged: false,
+      damage: 0,
+      reason: "ok",
+      steps,
+      animPathTiles: [start, corner, final],
+      animDirs: [dirBefore, ship.dir],
+    }
   };
 }
 
