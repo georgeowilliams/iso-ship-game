@@ -7,6 +7,7 @@ import { createKeyboardAdapter } from "./input/keyboard.js";
 import { getAllMaps, getMapById } from "./maps/maps.js";
 
 const canvas = document.getElementById("game");
+const startOverlay = document.getElementById("start-overlay");
 const mapSelect = document.getElementById("map-select");
 const startButton = document.getElementById("start-game");
 const quitButton = document.getElementById("quit");
@@ -227,7 +228,10 @@ function syncUi() {
   if (quitButton) {
     quitButton.style.display = engine.state.mode === "playing" ? "inline-block" : "none";
   }
+  if (startOverlay) {
+    startOverlay.style.display = engine.state.mode === "playing" ? "none" : "flex";
+  }
   if (canvas) {
-    canvas.style.opacity = engine.state.mode === "start" ? "0.4" : "1";
+    canvas.style.opacity = engine.state.mode === "playing" ? "1" : "0.4";
   }
 }
