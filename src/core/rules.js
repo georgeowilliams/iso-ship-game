@@ -18,6 +18,10 @@ export function blockedDamage(kind) {
   return 1;
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 /**
  * Move definitions (relative to facing):
  * - F: one tile forward
@@ -139,9 +143,28 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
   const corner = steps[0];
 
   if (!inBounds(next, corner.x, corner.y)) {
+    if (steps.length === 1) {
+      return bounceToStart(corner, 0, "oob");
+    }
+
+    const final = steps[1];
+    const landing = {
+      x: clamp(final.x, 0, next.cols - 1),
+      y: clamp(final.y, 0, next.rows - 1),
+    };
+    ship.x = landing.x;
+    ship.y = landing.y;
     return {
       nextState: next,
-      outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
+      outcome: {
+        moved: true,
+        damaged: false,
+        damage: 0,
+        reason: "corner_oob_slide",
+        steps,
+        animPathTiles: [start, corner, final, landing],
+        animDirs: [dirBefore, ship.dir, ship.dir],
+      }
     };
   }
 
