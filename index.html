@@ -5,53 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Isometric Ship Game (Refactor)</title>
     <style>
-      body { margin:0; height:100vh; display:grid; place-items:center; background:#111; position:relative; }
-      canvas { background:#fff; border-radius:12px; display:block; }
-      #game-container { display:flex; flex-direction:column; align-items:center; gap:12px; }
-      #canvas-wrap { position:relative; }
-      #start-overlay {
+      * { box-sizing:border-box; }
+      body {
+        margin:0;
+        min-height:100vh;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#111;
+        color:#eaeaea;
+        font:14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      }
+      .page-layout {
+        display:flex;
+        gap:24px;
+        padding:24px;
+      }
+      .stream-frame {
+        width:1280px;
+        height:720px;
+        position:relative;
+        background:#000;
+        border-radius:16px;
+        box-shadow:0 12px 40px rgba(0,0,0,0.45);
+        overflow:hidden;
+      }
+      #canvas-wrap {
+        width:100%;
+        height:100%;
+        position:relative;
+      }
+      canvas {
+        width:100%;
+        height:100%;
+        display:block;
+        background:#fff;
+      }
+      .overlay {
+        position:absolute;
+        inset:0;
+        pointer-events:none;
+        color:#f5f5f5;
+        text-shadow:0 1px 3px rgba(0,0,0,0.7);
+      }
+      .hud-block {
+        position:absolute;
+        background:rgba(0,0,0,0.35);
+        padding:10px 12px;
+        border-radius:12px;
+        min-width:190px;
+      }
+      .hud-top-left { top:16px; left:16px; }
+      .hud-top-right { top:16px; right:16px; text-align:right; }
+      .hud-bottom-left { bottom:16px; left:16px; max-width:520px; }
+      .hud-label { font-weight:600; margin-bottom:4px; }
+      .hud-muted { opacity:0.8; font-size:12px; }
+      .hud-votes { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; margin-top:6px; font-size:13px; }
+      .result-banner {
         position:absolute;
         inset:0;
         display:flex;
         align-items:center;
         justify-content:center;
-        background:rgba(0, 0, 0, 0.45);
-        z-index:2;
+        font-size:48px;
+        font-weight:700;
+        letter-spacing:2px;
+        background:rgba(0,0,0,0.55);
+        opacity:0;
+        transition:opacity 120ms ease;
       }
-      #start-overlay .panel {
-        background:#111;
-        color:#fff;
-        padding:16px 20px;
-        border-radius:12px;
+      .result-banner.is-visible { opacity:1; }
+      .status-banner {
+        position:absolute;
+        inset:0;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:28px;
+        font-weight:600;
+        letter-spacing:1px;
+        background:rgba(0,0,0,0.3);
+        opacity:0;
+        transition:opacity 120ms ease;
+      }
+      .status-banner.is-visible { opacity:1; }
+      .side-panel {
+        min-width:260px;
+        background:#1b1b1b;
+        border-radius:16px;
+        padding:16px;
         display:flex;
         flex-direction:column;
-        gap:12px;
-        font:14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        box-shadow:0 12px 30px rgba(0,0,0,0.45);
+        gap:16px;
+        box-shadow:0 8px 30px rgba(0,0,0,0.35);
       }
-      #start-overlay label { display:flex; align-items:center; gap:8px; }
-      #start-overlay select { padding:4px 6px; border-radius:6px; }
-      #start-overlay button { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
-      #quit { padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
-      #version { position:absolute; top:8px; right:12px; color:#777; font:10px system-ui, -apple-system, Segoe UI, Roboto, Arial; z-index:2; }
+      .side-panel h2 { margin:0 0 4px; font-size:16px; }
+      .side-panel label { display:flex; flex-direction:column; gap:6px; font-size:13px; }
+      .side-panel select {
+        padding:6px 8px;
+        border-radius:8px;
+        border:none;
+      }
+      .side-panel button {
+        padding:8px 12px;
+        border-radius:8px;
+        border:none;
+        cursor:pointer;
+        font-weight:600;
+      }
+      #quit { background:#6b1a1a; color:#fff; }
+      #start-game { background:#236c2e; color:#fff; }
+      #version { color:#777; font-size:11px; }
     </style>
   </head>
   <body>
-    <div id="version">v0.4.3</div>
-    <div id="game-container">
-      <div id="canvas-wrap">
-        <!-- bigger canvas so corners never clip -->
-        <canvas id="game" width="700" height="760"></canvas>
-        <div id="start-overlay">
-          <div class="panel">
-            <label>Map
-              <select id="map-select"></select>
-            </label>
-            <button id="start-game">Start</button>
+    <div class="page-layout">
+      <div class="stream-frame">
+        <div id="canvas-wrap">
+          <canvas id="game" width="1280" height="720"></canvas>
+          <div id="hud-overlay" class="overlay">
+            <div class="hud-block hud-top-left">
+              <div class="hud-label">Turn <span id="hud-turn">1</span></div>
+              <div id="hud-phase" class="hud-muted">Collecting</div>
+              <div id="hud-countdown">Next action in: 0.0s</div>
+              <div id="hud-position">Pos: (0, 0)</div>
+              <div id="hud-ammo">Ammo: 0</div>
+            </div>
+            <div class="hud-block hud-top-right">
+              <div>Queued: <span id="hud-queued">none</span></div>
+              <div>Participants: <span id="hud-participants">0</span></div>
+              <div class="hud-votes">
+                <div>Forward: <span id="hud-vote-forward">0</span></div>
+                <div>Left: <span id="hud-vote-left">0</span></div>
+                <div>Right: <span id="hud-vote-right">0</span></div>
+                <div>Shoot: <span id="hud-vote-shoot">0</span></div>
+              </div>
+            </div>
+            <div class="hud-block hud-bottom-left">
+              <div id="hud-controls" class="hud-muted">Controls: W/↑=Forward, A/←=F+Left, D/→=F+Right | Space=Shoot</div>
+            </div>
+            <div id="hud-status" class="status-banner">Waiting for start</div>
+            <div id="hud-result" class="result-banner">YOU WIN</div>
           </div>
         </div>
       </div>
-      <button id="quit">Quit</button>
+      <aside class="side-panel">
+        <div>
+          <h2>Admin</h2>
+          <label>Map
+            <select id="map-select"></select>
+          </label>
+        </div>
+        <button id="start-game">Start</button>
+        <button id="quit">Quit</button>
+        <div id="version">v0.4.3</div>
+      </aside>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
