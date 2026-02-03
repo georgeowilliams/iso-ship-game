@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

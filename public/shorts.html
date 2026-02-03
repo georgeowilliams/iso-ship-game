@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iso Ship Game - Shorts</title>
+    <link rel="stylesheet" href="/viewer.css" />
+  </head>
+  <body class="portrait" data-view="shorts">
+    <div class="page-layout">
+      <div class="stream-frame portrait">
+        <div id="canvas-wrap">
+          <canvas id="game" width="720" height="1280"></canvas>
+          <div id="hud-overlay" class="overlay">
+            <div class="hud-block hud-top-left">
+              <div class="hud-label">Turn <span id="hud-turn">1</span></div>
+              <div id="hud-phase" class="hud-muted">Voting</div>
+              <div id="hud-countdown">Next action in: 0.0s</div>
+              <div id="hud-position">Pos: (0, 0)</div>
+              <div id="hud-ammo">Ammo: 0</div>
+            </div>
+            <div class="hud-block hud-top-right">
+              <div>Queued: <span id="hud-queued">none</span></div>
+              <div>Participants: <span id="hud-participants">0</span></div>
+              <div class="hud-votes">
+                <div>Forward: <span id="hud-vote-forward">0</span></div>
+                <div>Left: <span id="hud-vote-left">0</span></div>
+                <div>Right: <span id="hud-vote-right">0</span></div>
+                <div>Shoot: <span id="hud-vote-shoot">0</span></div>
+              </div>
+            </div>
+            <div class="hud-block hud-bottom-left">
+              <div class="hud-muted">Portrait viewer (read-only)</div>
+            </div>
+            <div id="hud-status" class="status-banner">Waiting for server</div>
+            <div id="hud-result" class="result-banner">YOU WIN</div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">720 × 1280 portrait view</div>
+    </div>
+    <script type="module" src="/src/client/viewer.js"></script>
+  </body>
+</html>
