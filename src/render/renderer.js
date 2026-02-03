@@ -10,7 +10,7 @@ export class CanvasRenderer {
     this.assetManager = assetManager;
   }
 
-  render({ state, msLeft, lastMoveSteps, map, queuedPreview }) {
+  render({ state, msLeft, lastMoveSteps, map, queuedPreview, queuedActionLabel, voteStats }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
 
@@ -151,10 +151,33 @@ export class CanvasRenderer {
     const dirName = ["N", "E", "S", "W"][state.ship.dir];
     ctx.fillText(`pos: (${state.ship.x}, ${state.ship.y})  facing: ${dirName}`, 16, 62);
     ctx.fillText(`HP: ${state.ship.hp}   AMMO: ${state.ship.ammo}`, 16, 88);
-    ctx.fillText(`queued: ${state.queuedAction ? (state.queuedAction.label ?? state.queuedAction.type) : "—"}`, 16, 114);
+
+    if (state.mode === "playing") {
+      const hud = voteStats ?? {
+        countsByAction: { FORWARD: 0, LEFT: 0, RIGHT: 0, SHOOT: 0 },
+        uniqueVoters: 0,
+        totalVotes: 0,
+      };
+      const queuedLabel = queuedActionLabel ?? "none";
+      let y = 114;
+      ctx.fillText(`Queued: ${queuedLabel}`, 16, y);
+      y += 20;
+      ctx.fillText(`Voters: ${hud.uniqueVoters}`, 16, y);
+      y += 18;
+      ctx.fillText(`Votes: ${hud.totalVotes}`, 16, y);
+      y += 18;
+      ctx.fillText(`FORWARD: ${hud.countsByAction.FORWARD}`, 16, y);
+      y += 18;
+      ctx.fillText(`LEFT: ${hud.countsByAction.LEFT}`, 16, y);
+      y += 18;
+      ctx.fillText(`RIGHT: ${hud.countsByAction.RIGHT}`, 16, y);
+      y += 18;
+      ctx.fillText(`SHOOT: ${hud.countsByAction.SHOOT}`, 16, y);
+    }
 
     ctx.font = "13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(`controls: W/↑=Forward, A/←=F+Left, D/→=F+Right | space=shoot`, 16, 140);
+    const controlsY = state.mode === "playing" ? 260 : 140;
+    ctx.fillText(`controls: W/↑=Forward, A/←=F+Left, D/→=F+Right | space=shoot`, 16, controlsY);
   }
 }
 

@@ -29,12 +29,29 @@ const renderer = new CanvasRenderer(canvas, assetManager);
 
 // Input adapter: keyboard -> votes
 const keyboard = createKeyboardAdapter({ userId: "local" });
+const ACTION_CHOICES = ["FORWARD", "LEFT", "RIGHT", "SHOOT"];
+const voteStats = {
+  countsByAction: Object.fromEntries(ACTION_CHOICES.map((action) => [action, 0])),
+  votesByUser: new Map(),
+  totalVotes: 0,
+};
 let queuedPreview = null;
+let queuedActionLabel = null;
 let lastOutcomeRef = null;
 keyboard.start((vote) => {
   if (engine.state.mode !== "playing") return;
-  queuedPreview = voteToPreviewAction(vote.choice);
-  voteCollector.addVote(vote);
+  if (!vote?.userId) return;
+
+  const actionChoice = normalizeVoteChoice(vote.choice);
+  if (!actionChoice) return;
+
+  queuedActionLabel = actionChoice;
+  queuedPreview = voteToPreviewAction(actionChoice);
+  updateVoteStats({ userId: vote.userId, action: actionChoice, weight: vote.weight ?? 1 });
+
+  const internalChoice = actionToInternalChoice(actionChoice);
+  if (!internalChoice) return;
+  voteCollector.addVote({ ...vote, choice: internalChoice });
 });
 
 if (mapSelect) {
@@ -59,6 +76,8 @@ if (startButton) {
     engine.loadMap(currentMap);
     engine.state.mode = "playing";
     queuedPreview = null;
+    queuedActionLabel = null;
+    resetVoteStats();
   });
 }
 
@@ -71,6 +90,8 @@ function frame() {
   if (engine.lastOutcome && engine.lastOutcome !== lastOutcomeRef) {
     lastOutcomeRef = engine.lastOutcome;
     queuedPreview = null;
+    queuedActionLabel = null;
+    resetVoteStats();
   }
 
   renderer.render({
@@ -79,6 +100,8 @@ function frame() {
     lastMoveSteps: engine.lastMoveSteps,
     map: currentMap,
     queuedPreview,
+    queuedActionLabel,
+    voteStats: getVoteStatsSummary(),
   });
 
   syncUi();
@@ -99,7 +122,55 @@ function preloadMapAssets(map) {
 
 function voteToPreviewAction(choice) {
   if (choice === "SHOOT") return null;
-  return { type: "move", move: choice };
+  const move = actionToInternalChoice(choice);
+  if (!move) return null;
+  return { type: "move", move };
+}
+
+function normalizeVoteChoice(choice) {
+  if (typeof choice !== "string") return null;
+  const normalized = choice.toUpperCase();
+  if (ACTION_CHOICES.includes(normalized)) return normalized;
+  if (normalized === "F") return "FORWARD";
+  if (normalized === "L") return "LEFT";
+  if (normalized === "R") return "RIGHT";
+  if (normalized === "SHOOT") return "SHOOT";
+  return null;
+}
+
+function actionToInternalChoice(action) {
+  if (action === "FORWARD") return "F";
+  if (action === "LEFT") return "L";
+  if (action === "RIGHT") return "R";
+  if (action === "SHOOT") return "SHOOT";
+  return null;
+}
+
+function resetVoteStats() {
+  for (const action of ACTION_CHOICES) {
+    voteStats.countsByAction[action] = 0;
+  }
+  voteStats.votesByUser.clear();
+  voteStats.totalVotes = 0;
+}
+
+function updateVoteStats({ userId, action, weight }) {
+  const existing = voteStats.votesByUser.get(userId);
+  if (existing) {
+    voteStats.countsByAction[existing.action] -= existing.weight;
+    voteStats.totalVotes -= existing.weight;
+  }
+  voteStats.votesByUser.set(userId, { action, weight });
+  voteStats.countsByAction[action] += weight;
+  voteStats.totalVotes += weight;
+}
+
+function getVoteStatsSummary() {
+  return {
+    countsByAction: { ...voteStats.countsByAction },
+    uniqueVoters: voteStats.votesByUser.size,
+    totalVotes: voteStats.totalVotes,
+  };
 }
 
 if (restartButton) {
@@ -107,6 +178,8 @@ if (restartButton) {
     engine.loadMap(engine.state.mapId);
     engine.state.mode = "playing";
     queuedPreview = null;
+    queuedActionLabel = null;
+    resetVoteStats();
   });
 }
 
@@ -114,12 +187,15 @@ if (backButton) {
   backButton.addEventListener("click", () => {
     engine.state.mode = "mapSelect";
     queuedPreview = null;
+    queuedActionLabel = null;
+    resetVoteStats();
   });
 }
 
 function syncUi() {
   if (engine.state.mode !== "playing") {
     queuedPreview = null;
+    queuedActionLabel = null;
   }
   if (mapSelect) {
     mapSelect.disabled = engine.state.mode !== "mapSelect";
