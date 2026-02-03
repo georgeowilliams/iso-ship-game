@@ -10,7 +10,7 @@ export class CanvasRenderer {
     this.assetManager = assetManager;
   }
 
-  render({ state, msLeft, lastMoveSteps, map, queuedPreview, queuedActionLabel, voteStats }) {
+  render({ state, map, queuedPreview }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
     const nowMs = performance.now();
@@ -221,46 +221,8 @@ export class CanvasRenderer {
       fill: "#1d7f2e",
     });
 
-    // compass outside corners
+    // compass outside corners (visual arrows, no text)
     drawCompassOutside(ctx, state, originX, originY, tileW, tileH, pad);
-
-    // HUD
-    ctx.fillStyle = "#111";
-    ctx.font = "18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(`NEXT ACTION IN: ${(Math.max(0, msLeft) / 1000).toFixed(1)}s`, 16, 34);
-
-    ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    ctx.fillText(`pos: (${state.ship.x}, ${state.ship.y})`, 16, 62);
-    ctx.fillText(`Ammo: ${state.ship.ammo}`, 16, 88);
-
-    if (state.mode === "playing") {
-      const hud = voteStats ?? {
-        countsByAction: { FORWARD: 0, LEFT: 0, RIGHT: 0, SHOOT: 0 },
-        uniqueVoters: 0,
-        totalVotes: 0,
-      };
-      const queuedLabel = queuedActionLabel ?? "none";
-      let y = 166;
-      ctx.fillText(`Queued: ${queuedLabel}`, 16, y);
-      y += 20;
-      ctx.fillText(`Participants: ${hud.uniqueVoters}`, 16, y);
-      y += 18;
-      ctx.fillText(`FORWARD: ${hud.countsByAction.FORWARD}`, 16, y);
-      y += 18;
-      ctx.fillText(`LEFT: ${hud.countsByAction.LEFT}`, 16, y);
-      y += 18;
-      ctx.fillText(`RIGHT: ${hud.countsByAction.RIGHT}`, 16, y);
-      y += 18;
-      ctx.fillText(`SHOOT: ${hud.countsByAction.SHOOT}`, 16, y);
-    }
-
-    ctx.font = "13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    const controlsY = state.mode === "playing" ? 260 : 140;
-    ctx.fillText(`controls: W/↑=Forward, A/←=F+Left, D/→=F+Right | space=shoot`, 16, controlsY);
-
-    if (state.result) {
-      drawResultBanner(ctx, width, height, state.result);
-    }
   }
 }
 
@@ -455,17 +417,27 @@ function drawCompassOutside(ctx, state, originX, originY, tileW, tileH) {
   const Wp = outward(westEdge);
 
   ctx.fillStyle = "#000";
-  ctx.font = "bold 18px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  drawCompassArrow(ctx, Np.x, Np.y, 0, -1, off * 0.6);
+  drawCompassArrow(ctx, Ep.x, Ep.y, 1, 0, off * 0.6);
+  drawCompassArrow(ctx, Sp.x, Sp.y, 0, 1, off * 0.6);
+  drawCompassArrow(ctx, Wp.x, Wp.y, -1, 0, off * 0.6);
+}
 
-  ctx.fillText("↑", Np.x, Np.y);
-  ctx.fillText("→", Ep.x, Ep.y);
-  ctx.fillText("↓", Sp.x, Sp.y);
-  ctx.fillText("←", Wp.x, Wp.y);
+function drawCompassArrow(ctx, x, y, dx, dy, size) {
+  const tipX = x + dx * size * 0.9;
+  const tipY = y + dy * size * 0.9;
+  const baseX = x - dx * size * 0.2;
+  const baseY = y - dy * size * 0.2;
+  const perpX = -dy;
+  const perpY = dx;
+  const halfW = size * 0.4;
 
-  ctx.textAlign = "start";
-  ctx.textBaseline = "alphabetic";
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(baseX + perpX * halfW, baseY + perpY * halfW);
+  ctx.lineTo(baseX - perpX * halfW, baseY - perpY * halfW);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawWorldHealthBar(ctx, { centerX, centerY, offsetY, width, height, hp, maxHp, fill }) {
@@ -481,26 +453,4 @@ function drawWorldHealthBar(ctx, { centerX, centerY, offsetY, width, height, hp,
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y, width, height);
-}
-
-function drawResultBanner(ctx, width, height, result) {
-  const text = result === "win" ? "YOU WIN" : "YOU LOSE";
-  const boxW = Math.min(360, width * 0.7);
-  const boxH = 90;
-  const x = (width - boxW) / 2;
-  const y = (height - boxH) / 2;
-
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fillRect(x, y, boxW, boxH);
-  ctx.strokeStyle = "rgba(0,0,0,0.7)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, boxW, boxH);
-
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 42px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, width / 2, height / 2);
-  ctx.textAlign = "start";
-  ctx.textBaseline = "alphabetic";
 }
