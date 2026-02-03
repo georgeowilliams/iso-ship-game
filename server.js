@@ -2,6 +2,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
+import { statSync } from "node:fs";
 import { performance } from "node:perf_hooks";
 import crypto from "node:crypto";
 import { TurnEngine } from "./src/core/turnEngine.js";
@@ -161,6 +162,7 @@ function buildSnapshot() {
 
   return {
     state: cloneState(engine.state),
+    serverNowMs: performance.now(),
     turn: turnNumber,
     phase,
     countdownMs: msLeft,
@@ -261,8 +263,12 @@ function resolveStaticPath(urlPath) {
   ];
 
   for (const candidate of candidates) {
-    if (candidate.startsWith(__dirname)) {
-      return candidate;
+    if (!candidate.startsWith(__dirname)) continue;
+    try {
+      const stat = statSync(candidate);
+      if (stat.isFile()) return candidate;
+    } catch (error) {
+      continue;
     }
   }
   return null;
