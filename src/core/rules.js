@@ -114,6 +114,56 @@ export function resolveMove(state, move, nowMs) {
 }
 
 /**
+ * Resolve a MOVE action for the enemy ship deterministically.
+ */
+export function resolveEnemyMove(state, move, nowMs) {
+  const next = structuredCloneLite(state);
+
+  const blockedMap = makeBlockedMap(next.blocked);
+  const ship = next.enemy;
+  const { newDir, steps } = computeMoveSteps(ship.x, ship.y, ship.dir, move);
+
+  ship.dir = newDir;
+
+  if (steps.length === 0) {
+    return {
+      nextState: next,
+      outcome: { moved: false, damaged: false, damage: 0, reason: "noop", steps }
+    };
+  }
+
+  for (const s of steps) {
+    if (!inBounds(next, s.x, s.y)) {
+      return {
+        nextState: next,
+        outcome: { moved: false, damaged: false, damage: 0, reason: "oob", steps }
+      };
+    }
+    if (isBlocked(blockedMap, s.x, s.y)) {
+      const kind = blockedMap.get(`${s.x},${s.y}`);
+      const damage = blockedDamage(kind);
+      if (damage > 0) {
+        ship.hp = Math.max(0, ship.hp - damage);
+        ship.lastDamageAt = nowMs;
+      }
+      return {
+        nextState: next,
+        outcome: { moved: false, damaged: damage > 0, damage, reason: "blocked", steps }
+      };
+    }
+  }
+
+  const last = steps[steps.length - 1];
+  ship.x = last.x;
+  ship.y = last.y;
+
+  return {
+    nextState: next,
+    outcome: { moved: true, damaged: false, damage: 0, reason: "ok", steps }
+  };
+}
+
+/**
  * Resolve SHOOT deterministically (projectiles are "visual"; state still holds them).
  * Fires port+starboard 2 tiles away (ammo - 1).
  */
@@ -124,48 +174,79 @@ export function resolveShoot(state, nowMs) {
     return { nextState: next, outcome: { shot: false, reason: "no_ammo" } };
   }
 
-  const portDir = leftOf(next.ship.dir);
-  const starDir = rightOf(next.ship.dir);
+  const shotPaths = computeShotPaths(next, next.ship);
+  const durationMs = 450;
+
+  shotPaths.forEach((path) => {
+    const last = path[path.length - 1];
+    next.projectiles.push({
+      fromX: next.ship.x, fromY: next.ship.y,
+      toX: last.x, toY: last.y,
+      spawnTime: nowMs, durationMs,
+      path
+    });
+  });
+
+  next.ship.ammo = Math.max(0, next.ship.ammo - 1);
+  return { nextState: next, outcome: { shot: true, reason: "ok" } };
+}
+
+/**
+ * Resolve SHOOT for the enemy ship (projectiles are "visual"; state still holds them).
+ */
+export function resolveEnemyShoot(state, nowMs) {
+  const next = structuredCloneLite(state);
+
+  if (next.enemy.ammo <= 0) {
+    return { nextState: next, outcome: { shot: false, reason: "no_ammo" } };
+  }
+
+  const shotPaths = computeShotPaths(next, next.enemy);
+  const durationMs = 450;
+
+  shotPaths.forEach((path) => {
+    const last = path[path.length - 1];
+    next.projectiles.push({
+      fromX: next.enemy.x, fromY: next.enemy.y,
+      toX: last.x, toY: last.y,
+      spawnTime: nowMs, durationMs,
+      path
+    });
+  });
+
+  next.enemy.ammo = Math.max(0, next.enemy.ammo - 1);
+  return { nextState: next, outcome: { shot: true, reason: "ok" } };
+}
+
+export function computeShotPaths(state, ship) {
+  const portDir = leftOf(ship.dir);
+  const starDir = rightOf(ship.dir);
 
   const portV = DIR_V[portDir];
   const starV = DIR_V[starDir];
 
-  const portStep1 = { x: next.ship.x + portV.x, y: next.ship.y + portV.y };
-  const portStep2 = { x: next.ship.x + portV.x * 2, y: next.ship.y + portV.y * 2 };
-  const starStep1 = { x: next.ship.x + starV.x, y: next.ship.y + starV.y };
-  const starStep2 = { x: next.ship.x + starV.x * 2, y: next.ship.y + starV.y * 2 };
+  const portStep1 = { x: ship.x + portV.x, y: ship.y + portV.y };
+  const portStep2 = { x: ship.x + portV.x * 2, y: ship.y + portV.y * 2 };
+  const starStep1 = { x: ship.x + starV.x, y: ship.y + starV.y };
+  const starStep2 = { x: ship.x + starV.x * 2, y: ship.y + starV.y * 2 };
+  const paths = [];
 
-  const durationMs = 450;
-
-  if (inBounds(next, portStep1.x, portStep1.y)) {
+  if (inBounds(state, portStep1.x, portStep1.y)) {
     const path = [portStep1];
-    if (inBounds(next, portStep2.x, portStep2.y)) {
+    if (inBounds(state, portStep2.x, portStep2.y)) {
       path.push(portStep2);
     }
-    const last = path[path.length - 1];
-    next.projectiles.push({
-      fromX: next.ship.x, fromY: next.ship.y,
-      toX: last.x, toY: last.y,
-      spawnTime: nowMs, durationMs,
-      path
-    });
+    paths.push(path);
   }
-  if (inBounds(next, starStep1.x, starStep1.y)) {
+  if (inBounds(state, starStep1.x, starStep1.y)) {
     const path = [starStep1];
-    if (inBounds(next, starStep2.x, starStep2.y)) {
+    if (inBounds(state, starStep2.x, starStep2.y)) {
       path.push(starStep2);
     }
-    const last = path[path.length - 1];
-    next.projectiles.push({
-      fromX: next.ship.x, fromY: next.ship.y,
-      toX: last.x, toY: last.y,
-      spawnTime: nowMs, durationMs,
-      path
-    });
+    paths.push(path);
   }
 
-  next.ship.ammo = Math.max(0, next.ship.ammo - 1);
-  return { nextState: next, outcome: { shot: true, reason: "ok" } };
+  return paths;
 }
 
 /**
@@ -194,6 +275,8 @@ function structuredCloneLite(s) {
   return {
     ...s,
     ship: { ...s.ship },
+    enemy: { ...s.enemy },
+    enemySpawn: { ...s.enemySpawn },
     prev: { ...s.prev },
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,

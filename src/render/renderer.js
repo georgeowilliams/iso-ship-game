@@ -118,9 +118,33 @@ export class CanvasRenderer {
       ctx.fill();
     }
 
-    // --- ship ---
-    const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
+    // --- enemy ship ---
+    const enemyC = tileCenter(state.enemy.x, state.enemy.y, originX, originY, tileW, tileH);
     const r = Math.max(10, tileH * 0.30);
+    const enemyDirKey = ["N", "E", "S", "W"][state.enemy.dir] ?? "N";
+    const enemySprite = theme?.ship?.[enemyDirKey];
+    const enemyImage = enemySprite ? this.assetManager?.get(enemySprite) : null;
+
+    if (enemyImage) {
+      drawShipSprite(ctx, enemyImage, enemyC.x, enemyC.y, tileW, tileH);
+      ctx.strokeStyle = "rgba(175, 20, 20, 0.9)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemyC.x, enemyC.y, r * 0.95, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const flash = (performance.now() - state.enemy.lastDamageAt) < 220;
+      ctx.fillStyle = flash ? "#6b1a1a" : "#2f0b0b";
+      ctx.beginPath();
+      ctx.arc(enemyC.x, enemyC.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      const f = getForwardScreenUnit(state, state.enemy, originX, originY, tileW, tileH);
+      drawPointer(ctx, enemyC.x, enemyC.y, r, f.dx, f.dy);
+    }
+
+    // --- player ship ---
+    const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
     const dirKey = ["N", "E", "S", "W"][state.ship.dir] ?? "N";
     const shipSprite = theme?.ship?.[dirKey];
     const shipImage = shipSprite ? this.assetManager?.get(shipSprite) : null;
@@ -135,7 +159,7 @@ export class CanvasRenderer {
       ctx.fill();
 
       // pointer triangle BLACK, iso-correct (uses projected forward tile direction)
-      const f = getForwardScreenUnit(state, originX, originY, tileW, tileH);
+      const f = getForwardScreenUnit(state, state.ship, originX, originY, tileW, tileH);
       drawPointer(ctx, shipC.x, shipC.y, r, f.dx, f.dy);
     }
 
@@ -148,9 +172,29 @@ export class CanvasRenderer {
     ctx.fillText(`NEXT ACTION IN: ${(Math.max(0, msLeft) / 1000).toFixed(1)}s`, 16, 34);
 
     ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-    const dirName = ["N", "E", "S", "W"][state.ship.dir];
-    ctx.fillText(`pos: (${state.ship.x}, ${state.ship.y})  facing: ${dirName}`, 16, 62);
-    ctx.fillText(`HP: ${state.ship.hp}   AMMO: ${state.ship.ammo}`, 16, 88);
+    ctx.fillText(`pos: (${state.ship.x}, ${state.ship.y})`, 16, 62);
+    ctx.fillText(`Ammo: ${state.ship.ammo}`, 16, 88);
+
+    drawHealthBar(ctx, {
+      x: 16,
+      y: 110,
+      width: 180,
+      height: 14,
+      label: "Player",
+      hp: state.ship.hp,
+      maxHp: state.ship.maxHp ?? state.ship.hp,
+      fill: "#1d7f2e",
+    });
+    drawHealthBar(ctx, {
+      x: 16,
+      y: 132,
+      width: 180,
+      height: 14,
+      label: "Enemy",
+      hp: state.enemy.hp,
+      maxHp: state.enemy.maxHp ?? state.enemy.hp,
+      fill: "#b11d1d",
+    });
 
     if (state.mode === "playing") {
       const hud = voteStats ?? {
@@ -159,7 +203,7 @@ export class CanvasRenderer {
         totalVotes: 0,
       };
       const queuedLabel = queuedActionLabel ?? "none";
-      let y = 114;
+      let y = 166;
       ctx.fillText(`Queued: ${queuedLabel}`, 16, y);
       y += 20;
       ctx.fillText(`Participants: ${hud.uniqueVoters}`, 16, y);
@@ -235,10 +279,10 @@ function tileVariantIndex(seed, x, y, count) {
   return h1 % count;
 }
 
-function getForwardScreenUnit(state, originX, originY, tileW, tileH) {
-  const v = DIR_V[state.ship.dir];
-  const c0 = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
-  const c1 = tileCenter(state.ship.x + v.x, state.ship.y + v.y, originX, originY, tileW, tileH);
+function getForwardScreenUnit(state, ship, originX, originY, tileW, tileH) {
+  const v = DIR_V[ship.dir];
+  const c0 = tileCenter(ship.x, ship.y, originX, originY, tileW, tileH);
+  const c1 = tileCenter(ship.x + v.x, ship.y + v.y, originX, originY, tileW, tileH);
   let dx = c1.x - c0.x;
   let dy = c1.y - c0.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -307,11 +351,28 @@ function drawCompassOutside(ctx, state, originX, originY, tileW, tileH) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  ctx.fillText("N", Np.x, Np.y);
-  ctx.fillText("E", Ep.x, Ep.y);
-  ctx.fillText("S", Sp.x, Sp.y);
-  ctx.fillText("W", Wp.x, Wp.y);
+  ctx.fillText("↑", Np.x, Np.y);
+  ctx.fillText("→", Ep.x, Ep.y);
+  ctx.fillText("↓", Sp.x, Sp.y);
+  ctx.fillText("←", Wp.x, Wp.y);
 
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
+}
+
+function drawHealthBar(ctx, { x, y, width, height, label, hp, maxHp, fill }) {
+  const safeMax = Math.max(1, maxHp ?? 1);
+  const pct = clamp01(hp / safeMax);
+
+  ctx.fillStyle = "#111";
+  ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.fillText(`${label}: ${hp}/${safeMax}`, x, y - 2);
+
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.fillRect(x, y + 2, width, height);
+  ctx.fillStyle = fill;
+  ctx.fillRect(x, y + 2, width * pct, height);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y + 2, width, height);
 }

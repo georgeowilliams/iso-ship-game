@@ -5,6 +5,7 @@ export const MAPS = [
     grid: { rows: 7, cols: 7 },
     seed: 1337,
     spawn: { x: 3, y: 3, dir: 0, hp: 3, ammo: 15 },
+    enemySpawn: { x: 1, y: 5, dir: 2, hp: 3, ammo: 15 },
     blocked: [
       { x: 1, y: 1, kind: "rock" },
       { x: 2, y: 1, kind: "rock" },
@@ -50,6 +51,7 @@ export const MAPS = [
     grid: { rows: 7, cols: 7 },
     seed: 2024,
     spawn: { x: 3, y: 3, dir: 0, hp: 3, ammo: 15 },
+    enemySpawn: { x: 1, y: 5, dir: 2, hp: 3, ammo: 15 },
     blocked: [
       { x: 1, y: 1, kind: "rock" },
       { x: 2, y: 1, kind: "rock" },
@@ -95,6 +97,7 @@ export const MAPS = [
     grid: { rows: 7, cols: 7 },
     seed: 909,
     spawn: { x: 3, y: 3, dir: 0, hp: 3, ammo: 15 },
+    enemySpawn: { x: 1, y: 5, dir: 2, hp: 3, ammo: 15 },
     blocked: [
       { x: 1, y: 1, kind: "rock" },
       { x: 2, y: 1, kind: "rock" },

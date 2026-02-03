@@ -3,6 +3,8 @@ import { getMapById } from "../maps/maps.js";
 
 export function createInitialState(mapId) {
   const mapDef = getMapById(mapId);
+  const blockedKeys = new Set(mapDef.blocked.map((b) => `${b.x},${b.y}`));
+  const enemySpawn = mapDef.enemySpawn ?? findFallbackEnemySpawn(mapDef, blockedKeys);
   const hazardDamageByKey = {};
   (mapDef.hazards ?? []).forEach((hazard) => {
     hazardDamageByKey[`${hazard.x},${hazard.y}`] = hazard.damage;
@@ -19,8 +21,19 @@ export function createInitialState(mapId) {
       y: mapDef.spawn.y,
       dir: mapDef.spawn.dir ?? DIR.N,
       hp: mapDef.spawn.hp,
+      maxHp: mapDef.spawn.hp,
       ammo: mapDef.spawn.ammo,
     },
+    enemy: {
+      x: enemySpawn.x,
+      y: enemySpawn.y,
+      dir: enemySpawn.dir ?? DIR.S,
+      hp: enemySpawn.hp ?? mapDef.spawn.hp,
+      maxHp: enemySpawn.hp ?? mapDef.spawn.hp,
+      ammo: enemySpawn.ammo ?? mapDef.spawn.ammo,
+      lastDamageAt: 0,
+    },
+    enemySpawn: { ...enemySpawn },
     blocked: mapDef.blocked.map((b) => ({ ...b })),
     hazards: mapDef.hazards ? mapDef.hazards.map((h) => ({ ...h })) : [],
     hazardDamageByKey,
@@ -45,9 +58,23 @@ export function cloneState(s) {
   return {
     ...s,
     ship: { ...s.ship },
+    enemy: { ...s.enemy },
+    enemySpawn: { ...s.enemySpawn },
     prev: { ...s.prev },
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
   };
+}
+
+function findFallbackEnemySpawn(mapDef, blockedKeys) {
+  for (let y = 0; y < mapDef.grid.rows; y += 1) {
+    for (let x = 0; x < mapDef.grid.cols; x += 1) {
+      const key = `${x},${y}`;
+      if (blockedKeys.has(key)) continue;
+      if (x === mapDef.spawn.x && y === mapDef.spawn.y) continue;
+      return { x, y, dir: DIR.S, hp: mapDef.spawn.hp, ammo: mapDef.spawn.ammo };
+    }
+  }
+  return { x: mapDef.spawn.x, y: mapDef.spawn.y, dir: DIR.S, hp: mapDef.spawn.hp, ammo: mapDef.spawn.ammo };
 }
