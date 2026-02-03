@@ -9,10 +9,7 @@ import { getAllMaps, getMapById } from "./maps/maps.js";
 const canvas = document.getElementById("game");
 const mapSelect = document.getElementById("map-select");
 const startButton = document.getElementById("start-game");
-
-const gameOverOverlay = document.getElementById("game-over");
-const restartButton = document.getElementById("restart");
-const backButton = document.getElementById("back-to-maps");
+const quitButton = document.getElementById("quit");
 
 const voteCollector = new VoteCollector();
 const assetManager = new AssetManager();
@@ -65,6 +62,7 @@ if (mapSelect) {
   mapSelect.addEventListener("change", () => {
     currentMap = getMapById(mapSelect.value);
     engine.loadMap(currentMap);
+    engine.state.mode = "start";
     preloadMapAssets(currentMap);
   });
 }
@@ -74,24 +72,22 @@ if (startButton) {
     if (!mapSelect) return;
     currentMap = getMapById(mapSelect.value);
     engine.loadMap(currentMap);
-    engine.state.mode = "playing";
-    queuedPreview = null;
-    queuedActionLabel = null;
-    resetVoteStats();
+    startPlaying();
   });
 }
 
 preloadMapAssets(currentMap);
-engine.state.mode = "mapSelect";
+engine.state.mode = "start";
 syncUi();
 
 function frame() {
   engine.update();
+  if (engine.state.mode === "gameOver" || (engine.state.mode === "playing" && engine.state.ship.hp <= 0)) {
+    returnToStart();
+  }
   if (engine.lastOutcome && engine.lastOutcome !== lastOutcomeRef) {
     lastOutcomeRef = engine.lastOutcome;
-    queuedPreview = null;
-    queuedActionLabel = null;
-    resetVoteStats();
+    resetTurnUi();
   }
 
   renderer.render({
@@ -192,23 +188,29 @@ function getVoteStatsSummary() {
   };
 }
 
-if (restartButton) {
-  restartButton.addEventListener("click", () => {
-    engine.loadMap(engine.state.mapId);
-    engine.state.mode = "playing";
-    queuedPreview = null;
-    queuedActionLabel = null;
-    resetVoteStats();
+if (quitButton) {
+  quitButton.addEventListener("click", () => {
+    returnToStart();
   });
 }
 
-if (backButton) {
-  backButton.addEventListener("click", () => {
-    engine.state.mode = "mapSelect";
-    queuedPreview = null;
-    queuedActionLabel = null;
-    resetVoteStats();
-  });
+function resetTurnUi() {
+  queuedPreview = null;
+  queuedActionLabel = null;
+  resetVoteStats();
+  voteCollector.reset();
+}
+
+function startPlaying() {
+  engine.state.mode = "playing";
+  engine.state.queuedAction = null;
+  resetTurnUi();
+}
+
+function returnToStart() {
+  engine.state.mode = "start";
+  engine.state.queuedAction = null;
+  resetTurnUi();
 }
 
 function syncUi() {
@@ -217,12 +219,15 @@ function syncUi() {
     queuedActionLabel = null;
   }
   if (mapSelect) {
-    mapSelect.disabled = engine.state.mode !== "mapSelect";
+    mapSelect.disabled = engine.state.mode !== "start";
   }
   if (startButton) {
-    startButton.style.display = engine.state.mode === "mapSelect" ? "inline-block" : "none";
+    startButton.style.display = engine.state.mode === "start" ? "inline-block" : "none";
   }
-  if (gameOverOverlay) {
-    gameOverOverlay.style.display = engine.state.mode === "gameOver" ? "flex" : "none";
+  if (quitButton) {
+    quitButton.style.display = engine.state.mode === "playing" ? "inline-block" : "none";
+  }
+  if (canvas) {
+    canvas.style.opacity = engine.state.mode === "start" ? "0.4" : "1";
   }
 }
