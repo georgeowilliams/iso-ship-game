@@ -43,6 +43,10 @@ export function createInitialState(mapId) {
 
     // highlight of previous tile
     prev: { x: mapDef.spawn.x, y: mapDef.spawn.y },
+    playerPrev: null,
+    enemyPrev: null,
+    playerPrevJumpTile: null,
+    enemyPrevJumpTile: null,
 
     // queued action from any input adapter
     // { type: "move", move: "F"|"L"|"R" }
@@ -63,6 +67,10 @@ export function cloneState(s) {
     enemy: { ...s.enemy },
     enemySpawn: { ...s.enemySpawn },
     prev: { ...s.prev },
+    playerPrev: s.playerPrev ? { ...s.playerPrev } : null,
+    enemyPrev: s.enemyPrev ? { ...s.enemyPrev } : null,
+    playerPrevJumpTile: s.playerPrevJumpTile ? { ...s.playerPrevJumpTile } : null,
+    enemyPrevJumpTile: s.enemyPrevJumpTile ? { ...s.enemyPrevJumpTile } : null,
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),

@@ -60,14 +60,26 @@ export class TurnEngine {
 
     if (!action) {
       const { nextState, outcome } = resolveNoop(this.state);
-      this.state = nextState;
+      this.state = {
+        ...nextState,
+        playerPrev: null,
+        playerPrevJumpTile: null,
+      };
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
     }
 
     if (action?.type === "move") {
+      const playerBefore = { x: this.state.ship.x, y: this.state.ship.y };
       const { nextState, outcome } = resolveMove(this.state, action.move, t);
-      this.state = { ...nextState, queuedAction: null };
+      const moved = outcome.moved
+        && (playerBefore.x !== nextState.ship.x || playerBefore.y !== nextState.ship.y);
+      this.state = {
+        ...nextState,
+        queuedAction: null,
+        playerPrev: moved ? playerBefore : null,
+        playerPrevJumpTile: outcome.steps?.length === 2 ? { ...outcome.steps[0] } : null,
+      };
       if (outcome.moved) {
         this.applyHazardDamage(t);
       }
@@ -76,7 +88,12 @@ export class TurnEngine {
       this.lastMoveSteps = outcome.steps || null;
     } else if (action?.type === "shoot") {
       const { nextState, outcome } = resolveShoot(this.state, t);
-      this.state = { ...nextState, queuedAction: null };
+      this.state = {
+        ...nextState,
+        queuedAction: null,
+        playerPrev: null,
+        playerPrevJumpTile: null,
+      };
       if (outcome.shot) {
         this.applyShotDamage("ship", "enemy", t);
       }
@@ -86,7 +103,11 @@ export class TurnEngine {
     } else if (action) {
       // Unknown action -> treat as noop tick
       const { nextState, outcome } = resolveNoop({ ...this.state, queuedAction: null });
-      this.state = nextState;
+      this.state = {
+        ...nextState,
+        playerPrev: null,
+        playerPrevJumpTile: null,
+      };
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
     }
@@ -145,8 +166,15 @@ export class TurnEngine {
     if (!action) return;
 
     if (action.type === "move") {
+      const enemyBefore = { x: this.state.enemy.x, y: this.state.enemy.y };
       const { nextState, outcome } = resolveEnemyMove(this.state, action.move, nowMs);
-      this.state = nextState;
+      const moved = outcome.moved
+        && (enemyBefore.x !== nextState.enemy.x || enemyBefore.y !== nextState.enemy.y);
+      this.state = {
+        ...nextState,
+        enemyPrev: moved ? enemyBefore : null,
+        enemyPrevJumpTile: outcome.steps?.length === 2 ? { ...outcome.steps[0] } : null,
+      };
       if (outcome.moved) {
         this.applyEnemyHazardDamage(nowMs);
       }
@@ -156,7 +184,11 @@ export class TurnEngine {
 
     if (action.type === "shoot") {
       const { nextState, outcome } = resolveEnemyShoot(this.state, nowMs);
-      this.state = nextState;
+      this.state = {
+        ...nextState,
+        enemyPrev: null,
+        enemyPrevJumpTile: null,
+      };
       if (outcome.shot) {
         this.applyShotDamage("enemy", "ship", nowMs);
       }
