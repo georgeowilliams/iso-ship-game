@@ -10,6 +10,10 @@ const canvas = document.getElementById("game");
 const mapSelect = document.getElementById("map-select");
 const startButton = document.getElementById("start-game");
 
+const gameOverOverlay = document.getElementById("game-over");
+const restartButton = document.getElementById("restart");
+const backButton = document.getElementById("back-to-maps");
+
 const voteCollector = new VoteCollector();
 const assetManager = new AssetManager();
 const maps = getAllMaps();
@@ -32,41 +36,6 @@ keyboard.start((vote) => {
   queuedPreview = voteToPreviewAction(vote.choice);
   voteCollector.addVote(vote);
 });
-keyboard.start((vote) => voteCollector.addVote(vote));
-
-if (mapSelect) {
-  for (const map of MAPS) {
-    const option = document.createElement("option");
-    option.value = map.id;
-    option.textContent = map.name;
-    mapSelect.appendChild(option);
-  }
-  mapSelect.value = currentMap.id;
-  mapSelect.addEventListener("change", () => {
-    currentMap = getMapById(mapSelect.value);
-    engine.loadMap(currentMap);
-    preloadMapAssets(currentMap);
-  });
-}
-
-preloadMapAssets(currentMap);
-
-if (mapSelect) {
-  for (const map of MAPS) {
-    const option = document.createElement("option");
-    option.value = map.id;
-    option.textContent = map.name;
-    mapSelect.appendChild(option);
-  }
-  mapSelect.value = currentMap.id;
-  mapSelect.addEventListener("change", () => {
-    currentMap = getMapById(mapSelect.value);
-    engine.loadMap(currentMap);
-    preloadMapAssets(currentMap);
-  });
-}
-
-preloadMapAssets(currentMap);
 
 if (mapSelect) {
   for (const map of maps) {
@@ -132,10 +101,6 @@ function voteToPreviewAction(choice) {
   if (choice === "SHOOT") return null;
   return { type: "move", move: choice };
 }
-
-const gameOverOverlay = document.getElementById("game-over");
-const restartButton = document.getElementById("restart");
-const backButton = document.getElementById("back-to-maps");
 
 if (restartButton) {
   restartButton.addEventListener("click", () => {
