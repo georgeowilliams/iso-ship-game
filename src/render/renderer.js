@@ -13,6 +13,7 @@ export class CanvasRenderer {
   render({ state, msLeft, lastMoveSteps, map, queuedPreview, queuedActionLabel, voteStats }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
+    const nowMs = performance.now();
 
     ctx.clearRect(0, 0, width, height);
 
@@ -105,20 +106,20 @@ export class CanvasRenderer {
       }
     }
 
-    // --- projectile path highlights ---
-    for (const p of state.projectiles) {
-      const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
-      if (t >= 1) continue;
-      if (!Array.isArray(p.path)) continue;
-      p.path.forEach((tile, idx) => {
-        const tint = idx === 0 ? "rgba(255,140,0,0.25)" : "rgba(255,140,0,0.14)";
+    if (Array.isArray(state.lastShotTiles)) {
+      state.lastShotTiles.forEach((tile) => {
+        const tint = tile.level === 3
+          ? "rgba(255,60,60,0.32)"
+          : tile.level === 2
+            ? "rgba(255,150,0,0.26)"
+            : "rgba(255,220,120,0.22)";
         drawHighlight(ctx, state, tile.x, tile.y, originX, originY, tileW, tileH, tint);
       });
     }
 
     // --- projectiles (visual only) ---
     for (const p of state.projectiles) {
-      const t = clamp01((performance.now() - p.spawnTime) / p.durationMs);
+      const t = clamp01((nowMs - p.spawnTime) / p.durationMs);
       if (t >= 1) continue;
       const from = tileCenter(p.fromX, p.fromY, originX, originY, tileW, tileH);
       const to = tileCenter(p.toX, p.toY, originX, originY, tileW, tileH);
@@ -133,7 +134,8 @@ export class CanvasRenderer {
     }
 
     // --- enemy ship ---
-    const enemyC = tileCenter(state.enemy.x, state.enemy.y, originX, originY, tileW, tileH);
+    const enemyTile = getAnimatedTilePosition(state.enemy, nowMs);
+    const enemyC = tileCenter(enemyTile.x, enemyTile.y, originX, originY, tileW, tileH);
     const r = Math.max(10, tileH * 0.30);
     const enemyDirKey = ["N", "E", "S", "W"][state.enemy.dir] ?? "N";
     const enemySprite = theme?.ship?.[enemyDirKey];
@@ -147,7 +149,7 @@ export class CanvasRenderer {
       ctx.arc(enemyC.x, enemyC.y, r * 0.95, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      const flash = (performance.now() - state.enemy.lastDamageAt) < 220;
+      const flash = (nowMs - state.enemy.lastDamageAt) < 220;
       ctx.fillStyle = flash ? "#6b1a1a" : "#2f0b0b";
       ctx.beginPath();
       ctx.arc(enemyC.x, enemyC.y, r, 0, Math.PI * 2);
@@ -169,7 +171,8 @@ export class CanvasRenderer {
     });
 
     // --- player ship ---
-    const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
+    const shipTile = getAnimatedTilePosition(state.ship, nowMs);
+    const shipC = tileCenter(shipTile.x, shipTile.y, originX, originY, tileW, tileH);
     const dirKey = ["N", "E", "S", "W"][state.ship.dir] ?? "N";
     const shipSprite = theme?.ship?.[dirKey];
     const shipImage = shipSprite ? this.assetManager?.get(shipSprite) : null;
@@ -177,7 +180,7 @@ export class CanvasRenderer {
     if (shipImage) {
       drawShipSprite(ctx, shipImage, shipC.x, shipC.y, tileW, tileH);
     } else {
-      const flash = (performance.now() - state.lastDamageAt) < 220;
+      const flash = (nowMs - state.lastDamageAt) < 220;
       ctx.fillStyle = flash ? "#5a0c0c" : "#111";
       ctx.beginPath();
       ctx.arc(shipC.x, shipC.y, r, 0, Math.PI * 2);
@@ -291,6 +294,23 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
 
   ctx.fillStyle = rgba;
   ctx.fill();
+}
+
+function getAnimatedTilePosition(ship, nowMs) {
+  const MOVE_ANIM_MS = 200;
+  const prevX = ship.prevX ?? ship.x;
+  const prevY = ship.prevY ?? ship.y;
+  if (prevX === ship.x && prevY === ship.y) {
+    return { x: ship.x, y: ship.y };
+  }
+  if (!ship.movedAtMs) {
+    return { x: ship.x, y: ship.y };
+  }
+  const t = clamp01((nowMs - ship.movedAtMs) / MOVE_ANIM_MS);
+  return {
+    x: lerp(prevX, ship.x, t),
+    y: lerp(prevY, ship.y, t),
+  };
 }
 
 function tileVariantIndex(seed, x, y, count) {

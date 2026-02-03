@@ -9,7 +9,7 @@ export function createInitialState() {
       x: 3,
       y: 3,
       dir: DIR.N,
-      hp: 3,
+      hp: 6,
       ammo: 15,
     },
 
