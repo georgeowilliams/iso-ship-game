@@ -39,6 +39,7 @@ let queuedActionLabel = null;
 let lastOutcomeRef = null;
 keyboard.start((vote) => {
   if (engine.state.mode !== "playing") return;
+  if (engine.state.result) return;
   if (!vote?.userId) return;
 
   const actionChoice = normalizeVoteChoice(vote.choice);
@@ -83,8 +84,11 @@ syncUi();
 
 function frame() {
   engine.update();
-  if (engine.state.mode === "gameOver" || (engine.state.mode === "playing" && engine.state.ship.hp <= 0)) {
-    returnToStart();
+  if (engine.state.result && engine.state.resultAtMs) {
+    const elapsedMs = performance.now() - engine.state.resultAtMs;
+    if (elapsedMs >= 2000) {
+      returnToStart();
+    }
   }
   if (engine.lastOutcome && engine.lastOutcome !== lastOutcomeRef) {
     lastOutcomeRef = engine.lastOutcome;
@@ -205,12 +209,17 @@ function resetTurnUi() {
 function startPlaying() {
   engine.state.mode = "playing";
   engine.state.queuedAction = null;
+  engine.state.result = null;
+  engine.state.resultAtMs = null;
   resetTurnUi();
 }
 
 function returnToStart() {
+  engine.loadMap(currentMap);
   engine.state.mode = "start";
   engine.state.queuedAction = null;
+  engine.state.result = null;
+  engine.state.resultAtMs = null;
   resetTurnUi();
 }
 

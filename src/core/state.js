@@ -37,6 +37,8 @@ export function createInitialState(mapId) {
     blocked: mapDef.blocked.map((b) => ({ ...b })),
     hazards: mapDef.hazards ? mapDef.hazards.map((h) => ({ ...h })) : [],
     hazardDamageByKey,
+    result: null,
+    resultAtMs: null,
     mode: "playing",
 
     // highlight of previous tile
@@ -64,6 +66,8 @@ export function cloneState(s) {
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
+    result: s.result,
+    resultAtMs: s.resultAtMs,
   };
 }
 
