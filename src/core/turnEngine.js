@@ -51,6 +51,7 @@ export class TurnEngine {
     const overdue = t - this.nextTickAt;
     const steps = Math.floor(overdue / this.turnMs) + 1;
     this.nextTickAt += steps * this.turnMs;
+    this.state = { ...this.state, lastShotTiles: [] };
 
     let action = this.state.queuedAction;
     if (!action && this.voteCollector) {
@@ -74,6 +75,11 @@ export class TurnEngine {
       const { nextState, outcome } = resolveMove(this.state, action.move, t);
       const moved = outcome.moved
         && (playerBefore.x !== nextState.ship.x || playerBefore.y !== nextState.ship.y);
+      if (moved) {
+        nextState.ship.prevX = playerBefore.x;
+        nextState.ship.prevY = playerBefore.y;
+        nextState.ship.movedAtMs = t;
+      }
       this.state = {
         ...nextState,
         queuedAction: null,
@@ -170,6 +176,11 @@ export class TurnEngine {
       const { nextState, outcome } = resolveEnemyMove(this.state, action.move, nowMs);
       const moved = outcome.moved
         && (enemyBefore.x !== nextState.enemy.x || enemyBefore.y !== nextState.enemy.y);
+      if (moved) {
+        nextState.enemy.prevX = enemyBefore.x;
+        nextState.enemy.prevY = enemyBefore.y;
+        nextState.enemy.movedAtMs = nowMs;
+      }
       this.state = {
         ...nextState,
         enemyPrev: moved ? enemyBefore : null,
@@ -209,11 +220,14 @@ export class TurnEngine {
     const target = this.state[targetKey];
     const paths = computeShotPaths(this.state, attacker);
     let totalDamage = 0;
+    const damageByIndex = [3, 2, 1];
 
     paths.forEach((path) => {
-      if (path.some((tile) => tile.x === target.x && tile.y === target.y)) {
-        totalDamage += 1;
-      }
+      path.forEach((tile, idx) => {
+        if (tile.x === target.x && tile.y === target.y) {
+          totalDamage += damageByIndex[idx] ?? 0;
+        }
+      });
     });
 
     if (totalDamage <= 0) return;

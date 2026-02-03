@@ -165,7 +165,7 @@ export function resolveEnemyMove(state, move, nowMs) {
 
 /**
  * Resolve SHOOT deterministically (projectiles are "visual"; state still holds them).
- * Fires port+starboard 2 tiles away (ammo - 1).
+ * Fires forward up to 3 tiles (ammo - 1).
  */
 export function resolveShoot(state, nowMs) {
   const next = structuredCloneLite(state);
@@ -187,6 +187,7 @@ export function resolveShoot(state, nowMs) {
     });
   });
 
+  next.lastShotTiles = buildShotTiles(shotPaths);
   next.ship.ammo = Math.max(0, next.ship.ammo - 1);
   return { nextState: next, outcome: { shot: true, reason: "ok" } };
 }
@@ -214,39 +215,41 @@ export function resolveEnemyShoot(state, nowMs) {
     });
   });
 
+  next.lastShotTiles = buildShotTiles(shotPaths);
   next.enemy.ammo = Math.max(0, next.enemy.ammo - 1);
   return { nextState: next, outcome: { shot: true, reason: "ok" } };
 }
 
 export function computeShotPaths(state, ship) {
-  const portDir = leftOf(ship.dir);
-  const starDir = rightOf(ship.dir);
+  const f = DIR_V[ship.dir];
+  const blockedMap = makeBlockedMap(state.blocked);
+  const path = [];
 
-  const portV = DIR_V[portDir];
-  const starV = DIR_V[starDir];
+  for (let step = 1; step <= 3; step += 1) {
+    const x = ship.x + f.x * step;
+    const y = ship.y + f.y * step;
+    if (!inBounds(state, x, y)) break;
+    path.push({ x, y });
 
-  const portStep1 = { x: ship.x + portV.x, y: ship.y + portV.y };
-  const portStep2 = { x: ship.x + portV.x * 2, y: ship.y + portV.y * 2 };
-  const starStep1 = { x: ship.x + starV.x, y: ship.y + starV.y };
-  const starStep2 = { x: ship.x + starV.x * 2, y: ship.y + starV.y * 2 };
-  const paths = [];
-
-  if (inBounds(state, portStep1.x, portStep1.y)) {
-    const path = [portStep1];
-    if (inBounds(state, portStep2.x, portStep2.y)) {
-      path.push(portStep2);
+    if (isBlocked(blockedMap, x, y)) {
+      const kind = blockedMap.get(`${x},${y}`);
+      if (kind !== "reef" && kind !== "rock") break;
     }
-    paths.push(path);
-  }
-  if (inBounds(state, starStep1.x, starStep1.y)) {
-    const path = [starStep1];
-    if (inBounds(state, starStep2.x, starStep2.y)) {
-      path.push(starStep2);
-    }
-    paths.push(path);
   }
 
-  return paths;
+  return path.length > 0 ? [path] : [];
+}
+
+function buildShotTiles(paths) {
+  const damageByIndex = [3, 2, 1];
+  const tiles = [];
+  paths.forEach((path) => {
+    path.forEach((tile, idx) => {
+      const level = damageByIndex[idx] ?? 1;
+      tiles.push({ x: tile.x, y: tile.y, level });
+    });
+  });
+  return tiles;
 }
 
 /**
@@ -285,5 +288,6 @@ function structuredCloneLite(s) {
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
+    lastShotTiles: s.lastShotTiles ? s.lastShotTiles.map(t => ({ ...t })) : [],
   };
 }
