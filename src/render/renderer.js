@@ -162,9 +162,7 @@ export class CanvasRenderer {
       let y = 114;
       ctx.fillText(`Queued: ${queuedLabel}`, 16, y);
       y += 20;
-      ctx.fillText(`Voters: ${hud.uniqueVoters}`, 16, y);
-      y += 18;
-      ctx.fillText(`Votes: ${hud.totalVotes}`, 16, y);
+      ctx.fillText(`Participants: ${hud.uniqueVoters}`, 16, y);
       y += 18;
       ctx.fillText(`FORWARD: ${hud.countsByAction.FORWARD}`, 16, y);
       y += 18;
