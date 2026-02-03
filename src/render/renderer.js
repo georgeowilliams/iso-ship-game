@@ -84,33 +84,6 @@ export class CanvasRenderer {
     if (state.enemyPrevJumpTile) {
       drawHighlight(ctx, state, state.enemyPrevJumpTile.x, state.enemyPrevJumpTile.y, originX, originY, tileW, tileH, jumpTileTint);
     }
-    if (state.lastEdgeSlideLandingPlayer) {
-      drawHighlight(
-        ctx,
-        state,
-        state.lastEdgeSlideLandingPlayer.x,
-        state.lastEdgeSlideLandingPlayer.y,
-        originX,
-        originY,
-        tileW,
-        tileH,
-        queuedDestinationTint
-      );
-    }
-    if (state.lastEdgeSlideLandingEnemy) {
-      drawHighlight(
-        ctx,
-        state,
-        state.lastEdgeSlideLandingEnemy.x,
-        state.lastEdgeSlideLandingEnemy.y,
-        originX,
-        originY,
-        tileW,
-        tileH,
-        queuedDestinationTint
-      );
-    }
-
     // queued target & step1
     const pendingAction = queuedPreview ?? state.queuedAction;
     if (pendingAction?.type === "move") {
@@ -119,10 +92,15 @@ export class CanvasRenderer {
 
       if (steps.length === 2) {
         const s1 = steps[0];
-        let tint1 = jumpTileTint;
-        if (!inBounds(state, s1.x, s1.y)) tint1 = "rgba(255,165,0,0.18)";
-        else if (isBlocked(blockedMap, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
-        drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
+        const isQueuedFinal = queuedDestination
+          && queuedDestination.x === s1.x
+          && queuedDestination.y === s1.y;
+        if (!isQueuedFinal) {
+          let tint1 = jumpTileTint;
+          if (!inBounds(state, s1.x, s1.y)) tint1 = "rgba(255,165,0,0.18)";
+          else if (isBlocked(blockedMap, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
+          drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
+        }
       }
 
       if (queuedDestination) {
@@ -355,6 +333,10 @@ function resolveQueuedDestination(state, steps) {
       x: clamp(final.x, 0, state.cols - 1),
       y: clamp(final.y, 0, state.rows - 1),
     };
+  }
+
+  if (!inBounds(state, final.x, final.y)) {
+    return { x: corner.x, y: corner.y };
   }
 
   return final;
