@@ -8,12 +8,18 @@ export class CanvasRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.assetManager = assetManager;
+    this.timeOffsetMs = 0;
+  }
+
+  setTimeOffsetMs(offsetMs) {
+    if (!Number.isFinite(offsetMs)) return;
+    this.timeOffsetMs = offsetMs;
   }
 
   render({ state, map, queuedPreview }) {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
-    const nowMs = performance.now();
+    const nowMs = performance.now() - this.timeOffsetMs;
 
     ctx.clearRect(0, 0, width, height);
 
@@ -313,7 +319,7 @@ function getAnimatedShipPose(ship, nowMs) {
   if (!ship.movedAtMs || !Array.isArray(ship.animPathTiles) || ship.animPathTiles.length < 2) {
     return { x: ship.x, y: ship.y, dir: ship.dir };
   }
-  const elapsed = nowMs - ship.movedAtMs;
+  const elapsed = Math.max(0, nowMs - ship.movedAtMs);
   const segments = ship.animPathTiles.length - 1;
   const totalMoveMs = ship.animTotalMs && ship.animTotalMs > 0 ? ship.animTotalMs : MOVE_ANIM_MS;
   const segmentDuration = totalMoveMs / segments;
@@ -332,11 +338,12 @@ function getAnimatedShipPose(ship, nowMs) {
       effectiveElapsed -= holdMs;
     }
   }
-  const segIndex = Math.min(segments - 1, Math.floor(effectiveElapsed / segmentDuration));
+  const segIndex = Math.max(0, Math.min(segments - 1, Math.floor(effectiveElapsed / segmentDuration)));
   const segT = clamp01((effectiveElapsed - segmentDuration * segIndex) / segmentDuration);
   const start = ship.animPathTiles[segIndex];
   const end = ship.animPathTiles[segIndex + 1];
   const dir = ship.animDirs?.[segIndex] ?? ship.dir;
+  if (!start || !end) return { x: ship.x, y: ship.y, dir: ship.dir };
   return {
     x: lerp(start.x, end.x, segT),
     y: lerp(start.y, end.y, segT),

@@ -26,6 +26,8 @@ let latestState = null;
 let queuedPreview = null;
 let overlayState = {};
 let connectionStatus = "connecting";
+let timeOffsetMs = 0;
+let hasTimeOffset = false;
 
 const ACTION_TO_MOVE = {
   FORWARD: "F",
@@ -39,6 +41,11 @@ createWsClient({
     connectionStatus = "connected";
     ensureMap(latestState.mapId);
     queuedPreview = voteToPreviewAction(snapshot.queuedAction);
+    if (!hasTimeOffset && Number.isFinite(snapshot.serverNowMs)) {
+      timeOffsetMs = performance.now() - snapshot.serverNowMs;
+      renderer.setTimeOffsetMs(timeOffsetMs);
+      hasTimeOffset = true;
+    }
     updateOverlayUI(snapshot);
   },
   onStatus: (status) => {
