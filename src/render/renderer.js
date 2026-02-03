@@ -66,8 +66,22 @@ export class CanvasRenderer {
     }
 
     // --- highlights ---
-    // previous tile
-    drawHighlight(ctx, state, state.prev.x, state.prev.y, originX, originY, tileW, tileH, "rgba(0,180,255,0.18)");
+    const previousTileTint = "rgba(0,180,255,0.18)";
+    const jumpTileTint = "rgba(0,180,255,0.18)";
+
+    // previous tiles
+    if (state.playerPrev) {
+      drawHighlight(ctx, state, state.playerPrev.x, state.playerPrev.y, originX, originY, tileW, tileH, previousTileTint);
+    }
+    if (state.enemyPrev) {
+      drawHighlight(ctx, state, state.enemyPrev.x, state.enemyPrev.y, originX, originY, tileW, tileH, previousTileTint);
+    }
+    if (state.playerPrevJumpTile) {
+      drawHighlight(ctx, state, state.playerPrevJumpTile.x, state.playerPrevJumpTile.y, originX, originY, tileW, tileH, jumpTileTint);
+    }
+    if (state.enemyPrevJumpTile) {
+      drawHighlight(ctx, state, state.enemyPrevJumpTile.x, state.enemyPrevJumpTile.y, originX, originY, tileW, tileH, jumpTileTint);
+    }
 
     // queued target & step1
     const pendingAction = queuedPreview ?? state.queuedAction;
@@ -76,7 +90,7 @@ export class CanvasRenderer {
 
       if (steps.length === 2) {
         const s1 = steps[0];
-        let tint1 = "rgba(255,255,0,0.12)";
+        let tint1 = jumpTileTint;
         if (!inBounds(state, s1.x, s1.y)) tint1 = "rgba(255,165,0,0.18)";
         else if (isBlocked(blockedMap, s1.x, s1.y)) tint1 = "rgba(255,0,0,0.20)";
         drawHighlight(ctx, state, s1.x, s1.y, originX, originY, tileW, tileH, tint1);
@@ -196,27 +210,6 @@ export class CanvasRenderer {
     ctx.font = "16px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     ctx.fillText(`pos: (${state.ship.x}, ${state.ship.y})`, 16, 62);
     ctx.fillText(`Ammo: ${state.ship.ammo}`, 16, 88);
-
-    drawHealthBar(ctx, {
-      x: 16,
-      y: 110,
-      width: 180,
-      height: 14,
-      label: "Player",
-      hp: state.ship.hp,
-      maxHp: state.ship.maxHp ?? state.ship.hp,
-      fill: "#1d7f2e",
-    });
-    drawHealthBar(ctx, {
-      x: 16,
-      y: 132,
-      width: 180,
-      height: 14,
-      label: "Enemy",
-      hp: state.enemy.hp,
-      maxHp: state.enemy.maxHp ?? state.enemy.hp,
-      fill: "#b11d1d",
-    });
 
     if (state.mode === "playing") {
       const hud = voteStats ?? {
@@ -384,23 +377,6 @@ function drawCompassOutside(ctx, state, originX, originY, tileW, tileH) {
 
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
-}
-
-function drawHealthBar(ctx, { x, y, width, height, label, hp, maxHp, fill }) {
-  const safeMax = Math.max(1, maxHp ?? 1);
-  const pct = clamp01(hp / safeMax);
-
-  ctx.fillStyle = "#111";
-  ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  ctx.fillText(`${label}: ${hp}/${safeMax}`, x, y - 2);
-
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
-  ctx.fillRect(x, y + 2, width, height);
-  ctx.fillStyle = fill;
-  ctx.fillRect(x, y + 2, width * pct, height);
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y + 2, width, height);
 }
 
 function drawWorldHealthBar(ctx, { centerX, centerY, offsetY, width, height, hp, maxHp, fill }) {
