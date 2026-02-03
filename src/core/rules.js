@@ -22,6 +22,8 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+const BOUNCE_HOLD_MS = 90;
+
 /**
  * Move definitions (relative to facing):
  * - F: one tile forward
@@ -126,6 +128,7 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
 
   const bounceToStart = (target, damage, reason) => {
     damageShip(damage);
+    const shouldHold = reason === "oob" || reason === "blocked";
     return {
       nextState: next,
       outcome: {
@@ -136,6 +139,8 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
         steps,
         animPathTiles: [start, target, start],
         animDirs: [dirBefore, ship.dir],
+        animHoldIndex: shouldHold ? 1 : null,
+        animHoldMs: shouldHold ? BOUNCE_HOLD_MS : 0,
       }
     };
   };
@@ -164,6 +169,8 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
         steps,
         animPathTiles: [start, corner, final, landing],
         animDirs: [dirBefore, ship.dir, ship.dir],
+        animHoldIndex: 2,
+        animHoldMs: BOUNCE_HOLD_MS,
       }
     };
   }
@@ -210,6 +217,8 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
         steps,
         animPathTiles: [start, corner, final, corner],
         animDirs: [dirBefore, ship.dir, ship.dir],
+        animHoldIndex: 2,
+        animHoldMs: BOUNCE_HOLD_MS,
       }
     };
   }
@@ -246,6 +255,8 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
         steps,
         animPathTiles: [start, corner, final, corner],
         animDirs: [dirBefore, ship.dir, ship.dir],
+        animHoldIndex: 2,
+        animHoldMs: BOUNCE_HOLD_MS,
       }
     };
   }

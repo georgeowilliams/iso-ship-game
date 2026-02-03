@@ -9,6 +9,14 @@ import {
 } from "./rules.js";
 import { createInitialState } from "./state.js";
 
+const MOVE_SEGMENT_MS = 140;
+
+function computeAnimTotalMs(animPathTiles) {
+  if (!Array.isArray(animPathTiles)) return 0;
+  const segments = Math.max(1, animPathTiles.length - 1);
+  return MOVE_SEGMENT_MS * segments;
+}
+
 /**
  * TurnEngine owns:
  * - timing (tick every turnMs)
@@ -51,7 +59,13 @@ export class TurnEngine {
     const overdue = t - this.nextTickAt;
     const steps = Math.floor(overdue / this.turnMs) + 1;
     this.nextTickAt += steps * this.turnMs;
-    this.state = { ...this.state, lastShotTilesPlayer: [], lastShotTilesEnemy: [] };
+    this.state = {
+      ...this.state,
+      lastShotTilesPlayer: [],
+      lastShotTilesEnemy: [],
+      lastEdgeSlideLandingPlayer: null,
+      lastEdgeSlideLandingEnemy: null,
+    };
 
     let action = this.state.queuedAction;
     if (!action && this.voteCollector) {
@@ -84,9 +98,17 @@ export class TurnEngine {
         nextState.ship.animDirs = outcome.animDirs ?? (outcome.steps?.length === 2
           ? [playerDirBefore, nextState.ship.dir]
           : [nextState.ship.dir]);
+        nextState.ship.animTotalMs = computeAnimTotalMs(animPathTiles);
+        nextState.ship.animHoldIndex = Number.isInteger(outcome.animHoldIndex)
+          ? outcome.animHoldIndex
+          : null;
+        nextState.ship.animHoldMs = outcome.animHoldMs ?? 0;
       } else {
         nextState.ship.animPathTiles = null;
         nextState.ship.animDirs = null;
+        nextState.ship.animTotalMs = 0;
+        nextState.ship.animHoldIndex = null;
+        nextState.ship.animHoldMs = 0;
       }
       if (moved) {
         nextState.ship.prevX = playerBefore.x;
@@ -97,6 +119,9 @@ export class TurnEngine {
         queuedAction: null,
         playerPrev: moved ? playerBefore : null,
         playerPrevJumpTile: outcome.steps?.length === 2 ? { ...outcome.steps[0] } : null,
+        lastEdgeSlideLandingPlayer: outcome.reason === "corner_oob_slide"
+          ? { x: nextState.ship.x, y: nextState.ship.y }
+          : null,
       };
       if (outcome.moved) {
         this.applyHazardDamage(t);
@@ -197,9 +222,17 @@ export class TurnEngine {
         nextState.enemy.animDirs = outcome.animDirs ?? (outcome.steps?.length === 2
           ? [enemyDirBefore, nextState.enemy.dir]
           : [nextState.enemy.dir]);
+        nextState.enemy.animTotalMs = computeAnimTotalMs(animPathTiles);
+        nextState.enemy.animHoldIndex = Number.isInteger(outcome.animHoldIndex)
+          ? outcome.animHoldIndex
+          : null;
+        nextState.enemy.animHoldMs = outcome.animHoldMs ?? 0;
       } else {
         nextState.enemy.animPathTiles = null;
         nextState.enemy.animDirs = null;
+        nextState.enemy.animTotalMs = 0;
+        nextState.enemy.animHoldIndex = null;
+        nextState.enemy.animHoldMs = 0;
       }
       if (moved) {
         nextState.enemy.prevX = enemyBefore.x;
@@ -209,6 +242,9 @@ export class TurnEngine {
         ...nextState,
         enemyPrev: moved ? enemyBefore : null,
         enemyPrevJumpTile: outcome.steps?.length === 2 ? { ...outcome.steps[0] } : null,
+        lastEdgeSlideLandingEnemy: outcome.reason === "corner_oob_slide"
+          ? { x: nextState.enemy.x, y: nextState.enemy.y }
+          : null,
       };
       if (outcome.moved) {
         this.applyEnemyHazardDamage(nowMs);

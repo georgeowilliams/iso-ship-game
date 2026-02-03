@@ -28,6 +28,9 @@ export function createInitialState(mapId) {
       movedAtMs: 0,
       animPathTiles: null,
       animDirs: null,
+      animTotalMs: 0,
+      animHoldIndex: null,
+      animHoldMs: 0,
     },
     enemy: {
       x: enemySpawn.x,
@@ -42,6 +45,9 @@ export function createInitialState(mapId) {
       movedAtMs: 0,
       animPathTiles: null,
       animDirs: null,
+      animTotalMs: 0,
+      animHoldIndex: null,
+      animHoldMs: 0,
     },
     enemySpawn: { ...enemySpawn },
     blocked: mapDef.blocked.map((b) => ({ ...b })),
@@ -57,6 +63,8 @@ export function createInitialState(mapId) {
     enemyPrev: null,
     playerPrevJumpTile: null,
     enemyPrevJumpTile: null,
+    lastEdgeSlideLandingPlayer: null,
+    lastEdgeSlideLandingEnemy: null,
 
     // queued action from any input adapter
     // { type: "move", move: "F"|"L"|"R" }
@@ -83,6 +91,8 @@ export function cloneState(s) {
     enemyPrev: s.enemyPrev ? { ...s.enemyPrev } : null,
     playerPrevJumpTile: s.playerPrevJumpTile ? { ...s.playerPrevJumpTile } : null,
     enemyPrevJumpTile: s.enemyPrevJumpTile ? { ...s.enemyPrevJumpTile } : null,
+    lastEdgeSlideLandingPlayer: s.lastEdgeSlideLandingPlayer ? { ...s.lastEdgeSlideLandingPlayer } : null,
+    lastEdgeSlideLandingEnemy: s.lastEdgeSlideLandingEnemy ? { ...s.lastEdgeSlideLandingEnemy } : null,
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
