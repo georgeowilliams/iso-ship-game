@@ -143,6 +143,17 @@ export class CanvasRenderer {
       drawPointer(ctx, enemyC.x, enemyC.y, r, f.dx, f.dy);
     }
 
+    drawWorldHealthBar(ctx, {
+      centerX: enemyC.x,
+      centerY: enemyC.y,
+      offsetY: tileH * 0.9,
+      width: Math.max(32, tileW * 0.55),
+      height: Math.max(6, tileH * 0.18),
+      hp: state.enemy.hp,
+      maxHp: state.enemy.maxHp ?? state.enemy.hp,
+      fill: "#b11d1d",
+    });
+
     // --- player ship ---
     const shipC = tileCenter(state.ship.x, state.ship.y, originX, originY, tileW, tileH);
     const dirKey = ["N", "E", "S", "W"][state.ship.dir] ?? "N";
@@ -162,6 +173,17 @@ export class CanvasRenderer {
       const f = getForwardScreenUnit(state, state.ship, originX, originY, tileW, tileH);
       drawPointer(ctx, shipC.x, shipC.y, r, f.dx, f.dy);
     }
+
+    drawWorldHealthBar(ctx, {
+      centerX: shipC.x,
+      centerY: shipC.y,
+      offsetY: tileH * 0.9,
+      width: Math.max(32, tileW * 0.55),
+      height: Math.max(6, tileH * 0.18),
+      hp: state.ship.hp,
+      maxHp: state.ship.maxHp ?? state.ship.hp,
+      fill: "#1d7f2e",
+    });
 
     // compass outside corners
     drawCompassOutside(ctx, state, originX, originY, tileW, tileH, pad);
@@ -220,6 +242,10 @@ export class CanvasRenderer {
     ctx.font = "13px system-ui, -apple-system, Segoe UI, Roboto, Arial";
     const controlsY = state.mode === "playing" ? 260 : 140;
     ctx.fillText(`controls: W/↑=Forward, A/←=F+Left, D/→=F+Right | space=shoot`, 16, controlsY);
+
+    if (state.result) {
+      drawResultBanner(ctx, width, height, state.result);
+    }
   }
 }
 
@@ -375,4 +401,41 @@ function drawHealthBar(ctx, { x, y, width, height, label, hp, maxHp, fill }) {
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 1;
   ctx.strokeRect(x, y + 2, width, height);
+}
+
+function drawWorldHealthBar(ctx, { centerX, centerY, offsetY, width, height, hp, maxHp, fill }) {
+  const safeMax = Math.max(1, maxHp ?? 1);
+  const pct = clamp01(hp / safeMax);
+  const x = centerX - width / 2;
+  const y = centerY - offsetY - height;
+
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+  ctx.fillStyle = fill;
+  ctx.fillRect(x, y, width * pct, height);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, width, height);
+}
+
+function drawResultBanner(ctx, width, height, result) {
+  const text = result === "win" ? "YOU WIN" : "YOU LOSE";
+  const boxW = Math.min(360, width * 0.7);
+  const boxH = 90;
+  const x = (width - boxW) / 2;
+  const y = (height - boxH) / 2;
+
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(x, y, boxW, boxH);
+  ctx.strokeStyle = "rgba(0,0,0,0.7)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, boxW, boxH);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 42px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, width / 2, height / 2);
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
 }

@@ -44,6 +44,7 @@ export class TurnEngine {
         this.state = nextState;
       }
     }
+    if (this.state.result) return;
     if (t < this.nextTickAt) return;
 
     // catch-up without drift
@@ -68,8 +69,9 @@ export class TurnEngine {
       const { nextState, outcome } = resolveMove(this.state, action.move, t);
       this.state = { ...nextState, queuedAction: null };
       if (outcome.moved) {
-        this.applyHazardDamage();
+        this.applyHazardDamage(t);
       }
+      this.applyResultCheck(t);
       this.lastOutcome = outcome;
       this.lastMoveSteps = outcome.steps || null;
     } else if (action?.type === "shoot") {
@@ -78,6 +80,7 @@ export class TurnEngine {
       if (outcome.shot) {
         this.applyShotDamage("ship", "enemy", t);
       }
+      this.applyResultCheck(t);
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
     } else if (action) {
@@ -88,11 +91,9 @@ export class TurnEngine {
       this.lastMoveSteps = null;
     }
 
-    if (this.state.enemy.hp <= 0) {
-      this.respawnEnemy();
-    } else {
-      this.resolveEnemyTurn(t);
-    }
+    if (this.state.result) return;
+    this.resolveEnemyTurn(t);
+    this.applyResultCheck(t);
 
     if (this.voteCollector) this.voteCollector.reset();
   }
@@ -115,23 +116,27 @@ export class TurnEngine {
     this.lastMoveSteps = null;
   }
 
-  applyHazardDamage() {
+  applyHazardDamage(nowMs) {
     const key = `${this.state.ship.x},${this.state.ship.y}`;
     const damage = this.state.hazardDamageByKey?.[key] ?? 0;
     if (damage > 0) {
       this.state.ship.hp = Math.max(0, this.state.ship.hp - damage);
-      if (this.state.ship.hp === 0) {
-        this.state.mode = "gameOver";
-      }
+      this.state.lastDamageAt = nowMs;
+    }
+    if (this.state.ship.hp === 0) {
+      this.setResult("loss", nowMs);
     }
   }
 
-  applyEnemyHazardDamage() {
+  applyEnemyHazardDamage(nowMs) {
     const key = `${this.state.enemy.x},${this.state.enemy.y}`;
     const damage = this.state.hazardDamageByKey?.[key] ?? 0;
     if (damage > 0) {
       this.state.enemy.hp = Math.max(0, this.state.enemy.hp - damage);
-      this.state.enemy.lastDamageAt = this.now();
+      this.state.enemy.lastDamageAt = nowMs;
+    }
+    if (this.state.enemy.hp === 0) {
+      this.setResult("win", nowMs);
     }
   }
 
@@ -143,8 +148,9 @@ export class TurnEngine {
       const { nextState, outcome } = resolveEnemyMove(this.state, action.move, nowMs);
       this.state = nextState;
       if (outcome.moved) {
-        this.applyEnemyHazardDamage();
+        this.applyEnemyHazardDamage(nowMs);
       }
+      this.applyResultCheck(nowMs);
       return;
     }
 
@@ -183,22 +189,32 @@ export class TurnEngine {
     if (targetKey === "ship") {
       this.state.lastDamageAt = nowMs;
       if (target.hp === 0) {
-        this.state.mode = "gameOver";
+        this.setResult("loss", nowMs);
       }
     } else {
       target.lastDamageAt = nowMs;
+      if (target.hp === 0) {
+        this.setResult("win", nowMs);
+      }
     }
   }
 
-  respawnEnemy() {
-    this.state.enemy = {
-      ...this.state.enemy,
-      x: this.state.enemySpawn.x,
-      y: this.state.enemySpawn.y,
-      dir: this.state.enemySpawn.dir ?? this.state.enemy.dir,
-      hp: this.state.enemy.maxHp,
-      ammo: this.state.enemySpawn.ammo ?? this.state.enemy.ammo,
-      lastDamageAt: 0,
-    };
+  applyResultCheck(nowMs) {
+    if (this.state.result) return;
+    if (this.state.enemy.hp <= 0) {
+      this.setResult("win", nowMs);
+      return;
+    }
+    if (this.state.ship.hp <= 0) {
+      this.setResult("loss", nowMs);
+    }
+  }
+
+  setResult(result, nowMs) {
+    if (this.state.result) return;
+    this.state.result = result;
+    this.state.resultAtMs = nowMs;
+    this.state.queuedAction = null;
+    this.lastMoveSteps = null;
   }
 }
