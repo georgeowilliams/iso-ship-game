@@ -165,7 +165,7 @@ export function resolveEnemyMove(state, move, nowMs) {
 
 /**
  * Resolve SHOOT deterministically (projectiles are "visual"; state still holds them).
- * Fires forward up to 3 tiles (ammo - 1).
+ * Fires broadside up to 3 tiles (ammo - 1).
  */
 export function resolveShoot(state, nowMs) {
   const next = structuredCloneLite(state);
@@ -187,7 +187,7 @@ export function resolveShoot(state, nowMs) {
     });
   });
 
-  next.lastShotTiles = buildShotTiles(shotPaths);
+  next.lastShotTilesPlayer = buildShotTiles(shotPaths);
   next.ship.ammo = Math.max(0, next.ship.ammo - 1);
   return { nextState: next, outcome: { shot: true, reason: "ok" } };
 }
@@ -215,29 +215,39 @@ export function resolveEnemyShoot(state, nowMs) {
     });
   });
 
-  next.lastShotTiles = buildShotTiles(shotPaths);
+  next.lastShotTilesEnemy = buildShotTiles(shotPaths);
   next.enemy.ammo = Math.max(0, next.enemy.ammo - 1);
   return { nextState: next, outcome: { shot: true, reason: "ok" } };
 }
 
 export function computeShotPaths(state, ship) {
-  const f = DIR_V[ship.dir];
+  const left = DIR_V[leftOf(ship.dir)];
+  const right = DIR_V[rightOf(ship.dir)];
   const blockedMap = makeBlockedMap(state.blocked);
-  const path = [];
+  const paths = [];
 
-  for (let step = 1; step <= 3; step += 1) {
-    const x = ship.x + f.x * step;
-    const y = ship.y + f.y * step;
-    if (!inBounds(state, x, y)) break;
-    path.push({ x, y });
+  const buildPath = (dir) => {
+    const path = [];
+    for (let step = 1; step <= 3; step += 1) {
+      const x = ship.x + dir.x * step;
+      const y = ship.y + dir.y * step;
+      if (!inBounds(state, x, y)) break;
+      path.push({ x, y });
 
-    if (isBlocked(blockedMap, x, y)) {
-      const kind = blockedMap.get(`${x},${y}`);
-      if (kind !== "reef" && kind !== "rock") break;
+      if (isBlocked(blockedMap, x, y)) {
+        const kind = blockedMap.get(`${x},${y}`);
+        if (kind !== "reef" && kind !== "rock") break;
+      }
     }
-  }
+    return path;
+  };
 
-  return path.length > 0 ? [path] : [];
+  const leftPath = buildPath(left);
+  if (leftPath.length > 0) paths.push(leftPath);
+  const rightPath = buildPath(right);
+  if (rightPath.length > 0) paths.push(rightPath);
+
+  return paths;
 }
 
 function buildShotTiles(paths) {
@@ -288,6 +298,7 @@ function structuredCloneLite(s) {
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
-    lastShotTiles: s.lastShotTiles ? s.lastShotTiles.map(t => ({ ...t })) : [],
+    lastShotTilesPlayer: s.lastShotTilesPlayer ? s.lastShotTilesPlayer.map(t => ({ ...t })) : [],
+    lastShotTilesEnemy: s.lastShotTilesEnemy ? s.lastShotTilesEnemy.map(t => ({ ...t })) : [],
   };
 }

@@ -106,8 +106,9 @@ export class CanvasRenderer {
       }
     }
 
-    if (Array.isArray(state.lastShotTiles)) {
-      state.lastShotTiles.forEach((tile) => {
+    const drawShotTiles = (tiles) => {
+      if (!Array.isArray(tiles)) return;
+      tiles.forEach((tile) => {
         const tint = tile.level === 3
           ? "rgba(255,60,60,0.32)"
           : tile.level === 2
@@ -115,7 +116,9 @@ export class CanvasRenderer {
             : "rgba(255,220,120,0.22)";
         drawHighlight(ctx, state, tile.x, tile.y, originX, originY, tileW, tileH, tint);
       });
-    }
+    };
+    drawShotTiles(state.lastShotTilesEnemy);
+    drawShotTiles(state.lastShotTilesPlayer);
 
     // --- projectiles (visual only) ---
     for (const p of state.projectiles) {
@@ -134,10 +137,11 @@ export class CanvasRenderer {
     }
 
     // --- enemy ship ---
-    const enemyTile = getAnimatedTilePosition(state.enemy, nowMs);
+    const enemyPose = getAnimatedShipPose(state.enemy, nowMs);
+    const enemyTile = { x: enemyPose.x, y: enemyPose.y };
     const enemyC = tileCenter(enemyTile.x, enemyTile.y, originX, originY, tileW, tileH);
     const r = Math.max(10, tileH * 0.30);
-    const enemyDirKey = ["N", "E", "S", "W"][state.enemy.dir] ?? "N";
+    const enemyDirKey = ["N", "E", "S", "W"][enemyPose.dir] ?? "N";
     const enemySprite = theme?.ship?.[enemyDirKey];
     const enemyImage = enemySprite ? this.assetManager?.get(enemySprite) : null;
 
@@ -155,7 +159,7 @@ export class CanvasRenderer {
       ctx.arc(enemyC.x, enemyC.y, r, 0, Math.PI * 2);
       ctx.fill();
 
-      const f = getForwardScreenUnit(state, state.enemy, originX, originY, tileW, tileH);
+      const f = getForwardScreenUnit(state, enemyPose, originX, originY, tileW, tileH);
       drawPointer(ctx, enemyC.x, enemyC.y, r, f.dx, f.dy);
     }
 
@@ -171,9 +175,10 @@ export class CanvasRenderer {
     });
 
     // --- player ship ---
-    const shipTile = getAnimatedTilePosition(state.ship, nowMs);
+    const shipPose = getAnimatedShipPose(state.ship, nowMs);
+    const shipTile = { x: shipPose.x, y: shipPose.y };
     const shipC = tileCenter(shipTile.x, shipTile.y, originX, originY, tileW, tileH);
-    const dirKey = ["N", "E", "S", "W"][state.ship.dir] ?? "N";
+    const dirKey = ["N", "E", "S", "W"][shipPose.dir] ?? "N";
     const shipSprite = theme?.ship?.[dirKey];
     const shipImage = shipSprite ? this.assetManager?.get(shipSprite) : null;
 
@@ -187,7 +192,7 @@ export class CanvasRenderer {
       ctx.fill();
 
       // pointer triangle BLACK, iso-correct (uses projected forward tile direction)
-      const f = getForwardScreenUnit(state, state.ship, originX, originY, tileW, tileH);
+      const f = getForwardScreenUnit(state, shipPose, originX, originY, tileW, tileH);
       drawPointer(ctx, shipC.x, shipC.y, r, f.dx, f.dy);
     }
 
@@ -296,20 +301,23 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
   ctx.fill();
 }
 
-function getAnimatedTilePosition(ship, nowMs) {
+function getAnimatedShipPose(ship, nowMs) {
   const MOVE_ANIM_MS = 200;
-  const prevX = ship.prevX ?? ship.x;
-  const prevY = ship.prevY ?? ship.y;
-  if (prevX === ship.x && prevY === ship.y) {
-    return { x: ship.x, y: ship.y };
+  if (!ship.movedAtMs || !Array.isArray(ship.animPathTiles) || ship.animPathTiles.length < 2) {
+    return { x: ship.x, y: ship.y, dir: ship.dir };
   }
-  if (!ship.movedAtMs) {
-    return { x: ship.x, y: ship.y };
-  }
-  const t = clamp01((nowMs - ship.movedAtMs) / MOVE_ANIM_MS);
+  const elapsed = nowMs - ship.movedAtMs;
+  const segments = ship.animPathTiles.length - 1;
+  const segmentDuration = MOVE_ANIM_MS / segments;
+  const segIndex = Math.min(segments - 1, Math.floor(elapsed / segmentDuration));
+  const segT = clamp01((elapsed - segmentDuration * segIndex) / segmentDuration);
+  const start = ship.animPathTiles[segIndex];
+  const end = ship.animPathTiles[segIndex + 1];
+  const dir = ship.animDirs?.[segIndex] ?? ship.dir;
   return {
-    x: lerp(prevX, ship.x, t),
-    y: lerp(prevY, ship.y, t),
+    x: lerp(start.x, end.x, segT),
+    y: lerp(start.y, end.y, segT),
+    dir,
   };
 }
 
@@ -318,10 +326,10 @@ function tileVariantIndex(seed, x, y, count) {
   return h1 % count;
 }
 
-function getForwardScreenUnit(state, ship, originX, originY, tileW, tileH) {
-  const v = DIR_V[ship.dir];
-  const c0 = tileCenter(ship.x, ship.y, originX, originY, tileW, tileH);
-  const c1 = tileCenter(ship.x + v.x, ship.y + v.y, originX, originY, tileW, tileH);
+function getForwardScreenUnit(state, pose, originX, originY, tileW, tileH) {
+  const v = DIR_V[pose.dir];
+  const c0 = tileCenter(pose.x, pose.y, originX, originY, tileW, tileH);
+  const c1 = tileCenter(pose.x + v.x, pose.y + v.y, originX, originY, tileW, tileH);
   let dx = c1.x - c0.x;
   let dy = c1.y - c0.y;
   const len = Math.hypot(dx, dy) || 1;

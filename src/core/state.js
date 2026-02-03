@@ -26,6 +26,8 @@ export function createInitialState(mapId) {
       prevX: mapDef.spawn.x,
       prevY: mapDef.spawn.y,
       movedAtMs: 0,
+      animPathTiles: null,
+      animDirs: null,
     },
     enemy: {
       x: enemySpawn.x,
@@ -38,6 +40,8 @@ export function createInitialState(mapId) {
       prevX: enemySpawn.x,
       prevY: enemySpawn.y,
       movedAtMs: 0,
+      animPathTiles: null,
+      animDirs: null,
     },
     enemySpawn: { ...enemySpawn },
     blocked: mapDef.blocked.map((b) => ({ ...b })),
@@ -61,7 +65,8 @@ export function createInitialState(mapId) {
 
     // rendering-only ephemeral
     projectiles: [], // {fromX,fromY,toX,toY,spawnTime,durationMs}
-    lastShotTiles: [],
+    lastShotTilesPlayer: [],
+    lastShotTilesEnemy: [],
     lastDamageAt: 0,
   };
 }
@@ -81,7 +86,8 @@ export function cloneState(s) {
     blocked: s.blocked.map(p => ({ ...p })),
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
-    lastShotTiles: s.lastShotTiles ? s.lastShotTiles.map(t => ({ ...t })) : [],
+    lastShotTilesPlayer: s.lastShotTilesPlayer ? s.lastShotTilesPlayer.map(t => ({ ...t })) : [],
+    lastShotTilesEnemy: s.lastShotTilesEnemy ? s.lastShotTilesEnemy.map(t => ({ ...t })) : [],
     result: s.result,
     resultAtMs: s.resultAtMs,
   };
