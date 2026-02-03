@@ -69,6 +69,7 @@ export class CanvasRenderer {
     // --- highlights ---
     const previousTileTint = "rgba(0,180,255,0.18)";
     const jumpTileTint = "rgba(0,180,255,0.18)";
+    const edgeLandingTint = "rgba(255,215,0,0.22)";
 
     // previous tiles
     if (state.playerPrev) {
@@ -82,6 +83,32 @@ export class CanvasRenderer {
     }
     if (state.enemyPrevJumpTile) {
       drawHighlight(ctx, state, state.enemyPrevJumpTile.x, state.enemyPrevJumpTile.y, originX, originY, tileW, tileH, jumpTileTint);
+    }
+    if (state.lastEdgeSlideLandingPlayer) {
+      drawHighlight(
+        ctx,
+        state,
+        state.lastEdgeSlideLandingPlayer.x,
+        state.lastEdgeSlideLandingPlayer.y,
+        originX,
+        originY,
+        tileW,
+        tileH,
+        edgeLandingTint
+      );
+    }
+    if (state.lastEdgeSlideLandingEnemy) {
+      drawHighlight(
+        ctx,
+        state,
+        state.lastEdgeSlideLandingEnemy.x,
+        state.lastEdgeSlideLandingEnemy.y,
+        originX,
+        originY,
+        tileW,
+        tileH,
+        edgeLandingTint
+      );
     }
 
     // queued target & step1
@@ -308,9 +335,25 @@ function getAnimatedShipPose(ship, nowMs) {
   }
   const elapsed = nowMs - ship.movedAtMs;
   const segments = ship.animPathTiles.length - 1;
-  const segmentDuration = MOVE_ANIM_MS / segments;
-  const segIndex = Math.min(segments - 1, Math.floor(elapsed / segmentDuration));
-  const segT = clamp01((elapsed - segmentDuration * segIndex) / segmentDuration);
+  const totalMoveMs = ship.animTotalMs && ship.animTotalMs > 0 ? ship.animTotalMs : MOVE_ANIM_MS;
+  const segmentDuration = totalMoveMs / segments;
+  const holdIndex = Number.isInteger(ship.animHoldIndex) ? ship.animHoldIndex : null;
+  const holdMs = ship.animHoldMs ?? 0;
+  const totalMs = totalMoveMs + (holdIndex !== null ? holdMs : 0);
+  let effectiveElapsed = Math.min(elapsed, totalMs);
+  if (holdIndex !== null && holdMs > 0) {
+    const holdStart = segmentDuration * holdIndex;
+    if (effectiveElapsed >= holdStart && effectiveElapsed <= holdStart + holdMs) {
+      const holdTile = ship.animPathTiles[holdIndex];
+      const holdDir = ship.animDirs?.[Math.max(0, holdIndex - 1)] ?? ship.dir;
+      return { x: holdTile.x, y: holdTile.y, dir: holdDir };
+    }
+    if (effectiveElapsed > holdStart + holdMs) {
+      effectiveElapsed -= holdMs;
+    }
+  }
+  const segIndex = Math.min(segments - 1, Math.floor(effectiveElapsed / segmentDuration));
+  const segT = clamp01((effectiveElapsed - segmentDuration * segIndex) / segmentDuration);
   const start = ship.animPathTiles[segIndex];
   const end = ship.animPathTiles[segIndex + 1];
   const dir = ship.animDirs?.[segIndex] ?? ship.dir;
