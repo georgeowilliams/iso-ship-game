@@ -9,6 +9,7 @@ import { TurnEngine } from "./src/core/turnEngine.js";
 import { VoteCollector } from "./src/core/voteCollector.js";
 import { createInitialState, cloneState } from "./src/core/state.js";
 import { getAllMaps, getMapById } from "./src/maps/maps.js";
+import { YouTubeChatIngestor } from "./src/server/youtube/YouTubeChatIngestor.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +17,10 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT) || 5173;
 const LOCK_WINDOW_MS = 200;
 const TURN_MS = 2000;
+
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+const YOUTUBE_SHORTS_VIDEO_ID = process.env.YOUTUBE_SHORTS_VIDEO_ID;
+const YOUTUBE_LIVE_VIDEO_ID = process.env.YOUTUBE_LIVE_VIDEO_ID;
 
 const maps = getAllMaps();
 const defaultMap = maps[0];
@@ -53,6 +58,10 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
       await sendFile(res, path.join(__dirname, "index.html"));
+      return;
+    }
+    if (url.pathname === "/api/youtube/status") {
+      await sendJson(res, buildYouTubeStatus());
       return;
     }
     if (url.pathname === "/shorts") {
@@ -125,6 +134,8 @@ server.on("upgrade", (req, socket) => {
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
+const youtubeIngestors = startYouTubeIngestors();
 
 setInterval(() => {
   engine.update();
@@ -215,8 +226,13 @@ async function handleVote(req, res) {
     return;
   }
 
-  voteCollector.addVote({ userId: body.name, choice, weight: 1 });
-  broadcastSnapshot();
+  castVote({
+    turnId: turnNumber,
+    voterKey: body.name,
+    displayName: body.name,
+    action: body.action,
+    source: "manual",
+  });
 
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ ok: true }));
@@ -285,6 +301,11 @@ async function sendFile(res, filePath) {
   }
 }
 
+async function sendJson(res, payload) {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(payload));
+}
+
 function contentType(filePath) {
   const ext = path.extname(filePath);
   if (ext === ".html") return "text/html";
@@ -321,4 +342,66 @@ function sendWsMessage(socket, message) {
   }
 
   socket.write(Buffer.concat([header, payload]));
+}
+
+function castVote({ voterKey, action }) {
+  const { phase } = getVotingPhase();
+  if (phase !== "voting") return false;
+  const choice = actionLabelToVoteChoice(action);
+  if (!choice || !voterKey) return false;
+  voteCollector.addVote({ userId: voterKey, choice, weight: 1 });
+  broadcastSnapshot();
+  return true;
+}
+
+function getVotingPhase() {
+  const msLeft = Math.max(0, engine.msLeft());
+  const phase = engine.state.result
+    ? "resolving"
+    : msLeft <= LOCK_WINDOW_MS
+      ? "locked"
+      : "voting";
+  return { phase, msLeft };
+}
+
+function startYouTubeIngestors() {
+  const ingestors = [];
+  if (!YOUTUBE_API_KEY) {
+    console.warn("[YouTube] YOUTUBE_API_KEY missing; ingestion disabled.");
+    return ingestors;
+  }
+
+  const configs = [
+    {
+      videoId: YOUTUBE_SHORTS_VIDEO_ID,
+      source: "youtube_shorts",
+    },
+    {
+      videoId: YOUTUBE_LIVE_VIDEO_ID,
+      source: "youtube_live",
+    },
+  ];
+
+  for (const config of configs) {
+    if (!config.videoId) continue;
+    const ingestor = new YouTubeChatIngestor({
+      apiKey: YOUTUBE_API_KEY,
+      videoId: config.videoId,
+      source: config.source,
+      castVote,
+      getTurnId: () => turnNumber,
+      logger: console,
+    });
+    ingestor.start();
+    ingestors.push(ingestor);
+  }
+
+  return ingestors;
+}
+
+function buildYouTubeStatus() {
+  return {
+    enabled: Boolean(YOUTUBE_API_KEY && youtubeIngestors.length > 0),
+    streams: youtubeIngestors.map((ingestor) => ingestor.getStatus()),
+  };
 }
