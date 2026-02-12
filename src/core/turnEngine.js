@@ -7,7 +7,7 @@ import {
   resolveEnemyShoot,
   computeShotPaths
 } from "./rules.js";
-import { createInitialState } from "./state.js";
+import { computeCameraWindow, createInitialState } from "./state.js";
 
 const MOVE_SEGMENT_MS = 140;
 
@@ -37,6 +37,8 @@ export class TurnEngine {
     // Useful for UI: last move steps + outcome
     this.lastOutcome = null;
     this.lastMoveSteps = null;
+    this.updateCamera();
+    this.captureCheckpointIfReached();
   }
 
   queueAction(action) {
@@ -66,6 +68,7 @@ export class TurnEngine {
       lastEdgeSlideLandingPlayer: null,
       lastEdgeSlideLandingEnemy: null,
     };
+    this.state.turnIndex = (this.state.turnIndex ?? 0) + 1;
 
     let action = this.state.queuedAction;
     if (!action && this.voteCollector) {
@@ -80,6 +83,8 @@ export class TurnEngine {
         playerPrev: null,
         playerPrevJumpTile: null,
       };
+      this.updateCamera();
+      this.captureCheckpointIfReached();
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
     }
@@ -126,6 +131,8 @@ export class TurnEngine {
       if (outcome.moved) {
         this.applyHazardDamage(t);
       }
+      this.updateCamera();
+      this.captureCheckpointIfReached();
       this.applyResultCheck(t);
       this.lastOutcome = outcome;
       this.lastMoveSteps = outcome.steps || null;
@@ -140,6 +147,8 @@ export class TurnEngine {
       if (outcome.shot) {
         this.applyShotDamage("ship", "enemy", t);
       }
+      this.updateCamera();
+      this.captureCheckpointIfReached();
       this.applyResultCheck(t);
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
@@ -151,6 +160,8 @@ export class TurnEngine {
         playerPrev: null,
         playerPrevJumpTile: null,
       };
+      this.updateCamera();
+      this.captureCheckpointIfReached();
       this.lastOutcome = outcome;
       this.lastMoveSteps = null;
     }
@@ -178,6 +189,50 @@ export class TurnEngine {
     this.nextTickAt = this.now() + this.turnMs;
     this.lastOutcome = null;
     this.lastMoveSteps = null;
+    this.updateCamera();
+    this.captureCheckpointIfReached();
+  }
+
+
+  updateCamera() {
+    const { viewX0, viewY0 } = computeCameraWindow({
+      world: this.state.world,
+      viewCols: this.state.viewCols,
+      viewRows: this.state.viewRows,
+      focusX: this.state.ship.x,
+      focusY: this.state.ship.y,
+    });
+    this.state.viewX0 = viewX0;
+    this.state.viewY0 = viewY0;
+  }
+
+  captureCheckpointIfReached() {
+    const checkpoints = this.state.checkpoints ?? [];
+    const hit = checkpoints.find((checkpoint) => {
+      const dx = Math.abs(this.state.ship.x - checkpoint.x);
+      const dy = Math.abs(this.state.ship.y - checkpoint.y);
+      return Math.max(dx, dy) <= (checkpoint.radius ?? 0);
+    });
+    if (!hit || hit.id === this.state.lastCheckpointId) return;
+    this.state.lastCheckpointId = hit.id;
+    this.state.lastCheckpoint = {
+      id: hit.id,
+      turnIndex: this.state.turnIndex ?? 0,
+      ship: {
+        x: this.state.ship.x,
+        y: this.state.ship.y,
+        dir: this.state.ship.dir,
+        hp: this.state.ship.hp,
+        ammo: this.state.ship.ammo,
+      },
+      enemy: this.state.enemy ? {
+        x: this.state.enemy.x,
+        y: this.state.enemy.y,
+        dir: this.state.enemy.dir,
+        hp: this.state.enemy.hp,
+        ammo: this.state.enemy.ammo,
+      } : undefined,
+    };
   }
 
   applyHazardDamage(nowMs) {

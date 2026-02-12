@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createInitialState } from "../src/core/state.js";
-import { resolveMove, resolveNoop, resolveShoot, computeMoveSteps } from "../src/core/rules.js";
+import { createInitialState, expandBlockedGroups } from "../src/core/state.js";
+import { resolveMove, resolveNoop, resolveShoot, computeMoveSteps, inBounds } from "../src/core/rules.js";
 import { leftOf, rightOf } from "../src/core/constants.js";
 
 describe("rules: movement", () => {
@@ -22,7 +22,7 @@ describe("rules: movement", () => {
     const { nextState, outcome } = resolveMove(s, "L", 123);
     expect(outcome.moved).toBe(false);
     expect(outcome.damaged).toBe(true);
-    expect(nextState.ship.hp).toBe(2);
+    expect(nextState.ship.hp).toBe(5);
     expect(outcome.damage).toBe(1);
     expect(nextState.ship.dir).toBe(leftOf(s.ship.dir));
     // ship does not move
@@ -37,13 +37,13 @@ describe("rules: movement", () => {
     // Facing N: step1=(3,2), step2=(4,2)
     s.blocked = [{ x: 4, y: 2, kind: "reef" }];
     const { nextState, outcome } = resolveMove(s, "R", 0);
-    expect(outcome.moved).toBe(false);
+    expect(outcome.moved).toBe(true);
     expect(outcome.damaged).toBe(true);
-    expect(nextState.ship.hp).toBe(2);
+    expect(nextState.ship.hp).toBe(5);
     expect(outcome.damage).toBe(1);
     expect(nextState.ship.dir).toBe(rightOf(s.ship.dir));
     expect(nextState.ship.x).toBe(3);
-    expect(nextState.ship.y).toBe(3);
+    expect(nextState.ship.y).toBe(2);
     expect(nextState.prev).toEqual({ x: 3, y: 3 });
   });
 
@@ -54,7 +54,7 @@ describe("rules: movement", () => {
     expect(outcome.moved).toBe(false);
     expect(outcome.damaged).toBe(false);
     expect(outcome.damage).toBe(0);
-    expect(nextState.ship.hp).toBe(3);
+    expect(nextState.ship.hp).toBe(6);
     expect(nextState.ship.x).toBe(3);
     expect(nextState.ship.y).toBe(3);
     expect(nextState.prev).toEqual({ x: 3, y: 3 });
@@ -87,8 +87,8 @@ describe("rules: shooting paths", () => {
     const { nextState } = resolveShoot(s, 0);
     expect(nextState.projectiles).toHaveLength(2);
     const [port, star] = nextState.projectiles;
-    expect(port.path).toEqual([{ x: 2, y: 3 }, { x: 1, y: 3 }]);
-    expect(star.path).toEqual([{ x: 4, y: 3 }, { x: 5, y: 3 }]);
+    expect(port.path).toEqual([{ x: 2, y: 3 }, { x: 1, y: 3 }, { x: 0, y: 3 }]);
+    expect(star.path).toEqual([{ x: 4, y: 3 }, { x: 5, y: 3 }, { x: 6, y: 3 }]);
   });
 
   it("OOB step2 truncates path but still spawns projectile", () => {
@@ -109,5 +109,37 @@ describe("rules: shooting paths", () => {
     const { nextState } = resolveShoot(s, 0);
     const port = nextState.projectiles.find((p) => p.path?.[0]?.x === -1);
     expect(port).toBeUndefined();
+  });
+});
+
+
+describe("rules: world bounds", () => {
+  it("inBounds uses world bounds rather than viewport size", () => {
+    const s = createInitialState("grand-world");
+    expect(inBounds(s, 24, 24)).toBe(true);
+    expect(inBounds(s, 25, 24)).toBe(false);
+    expect(inBounds(s, s.viewX0 + s.viewCols, s.viewY0)).toBe(true);
+  });
+});
+
+describe("state: blocked group expansion", () => {
+  it("expands bottom-anchored rectangular footprints into collision tiles", () => {
+    const tiles = expandBlockedGroups([
+      {
+        id: "test-group",
+        kind: "wall",
+        anchor: { x: 10, y: 7, anchorMode: "bottom" },
+        footprint: { w: 3, h: 2 },
+      },
+    ]);
+
+    expect(tiles).toEqual([
+      { x: 10, y: 6, kind: "wall", groupId: "test-group" },
+      { x: 11, y: 6, kind: "wall", groupId: "test-group" },
+      { x: 12, y: 6, kind: "wall", groupId: "test-group" },
+      { x: 10, y: 7, kind: "wall", groupId: "test-group" },
+      { x: 11, y: 7, kind: "wall", groupId: "test-group" },
+      { x: 12, y: 7, kind: "wall", groupId: "test-group" },
+    ]);
   });
 });

@@ -21,9 +21,9 @@ export function computeGridCorners(state, originX, originY, tileW, tileH) {
   const halfH = tileH / 2;
 
   const top = gridToIsoTop(0, 0, originX, originY, tileW, tileH);
-  const tr = gridToIsoTop(state.cols - 1, 0, originX, originY, tileW, tileH);
-  const br = gridToIsoTop(state.cols - 1, state.rows - 1, originX, originY, tileW, tileH);
-  const bl = gridToIsoTop(0, state.rows - 1, originX, originY, tileW, tileH);
+  const tr = gridToIsoTop(state.viewCols - 1, 0, originX, originY, tileW, tileH);
+  const br = gridToIsoTop(state.viewCols - 1, state.viewRows - 1, originX, originY, tileW, tileH);
+  const bl = gridToIsoTop(0, state.viewRows - 1, originX, originY, tileW, tileH);
 
   const topCorner = { x: top.sx, y: top.sy };
   const rightCorner = { x: tr.sx + halfW, y: tr.sy + halfH };
@@ -34,8 +34,8 @@ export function computeGridCorners(state, originX, originY, tileW, tileH) {
 }
 
 export function computeOrigin(state, canvasW, canvasH, tileW, tileH) {
-  const isoW = (state.cols + state.rows) * (tileW / 2);
-  const isoH = (state.cols + state.rows) * (tileH / 2) + tileH;
+  const isoW = (state.viewCols + state.viewRows) * (tileW / 2);
+  const isoH = (state.viewCols + state.viewRows) * (tileH / 2) + tileH;
 
   const pad = Math.max(40, tileW);
   const originX = Math.floor((canvasW - isoW) / 2 + isoW / 2);

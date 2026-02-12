@@ -34,7 +34,7 @@ export class CanvasRenderer {
     }
 
     // tile sizing tuned for big canvas
-    const tileW = Math.floor(Math.min(width, height) / (state.cols + state.rows) * 1.85);
+    const tileW = Math.floor(Math.min(width, height) / (state.viewCols + state.viewRows) * 1.85);
     const tileH = Math.floor(tileW / 2);
 
     const { originX, originY, pad } = computeOrigin(state, width, height, tileW, tileH);
@@ -42,12 +42,16 @@ export class CanvasRenderer {
     const tileVariants = theme?.tiles?.variants ?? [];
     const blockedKinds = theme?.blocked?.kinds ?? {};
 
-    // --- tiles ---
-    for (let gy = 0; gy < state.rows; gy++) {
-      for (let gx = 0; gx < state.cols; gx++) {
-        const { sx, sy } = gridToIsoTop(gx, gy, originX, originY, tileW, tileH);
+    const groupCoveredKeys = new Set(state.blocked.filter((tile) => tile.groupId).map((tile) => `${tile.x},${tile.y}`));
+
+    // --- base tiles in viewport ---
+    for (let vy = 0; vy < state.viewRows; vy++) {
+      for (let vx = 0; vx < state.viewCols; vx++) {
+        const wx = state.viewX0 + vx;
+        const wy = state.viewY0 + vy;
+        const { sx, sy } = gridToIsoTop(vx, vy, originX, originY, tileW, tileH);
         if (tileVariants.length > 0) {
-          const tileIndex = tileVariantIndex(state.mapSeed ?? 0, gx, gy, tileVariants.length);
+          const tileIndex = tileVariantIndex(state.mapSeed ?? 0, wx, wy, tileVariants.length);
           const tileUrl = tileVariants[tileIndex];
           const tileImage = this.assetManager?.get(tileUrl);
           if (tileImage) {
@@ -58,18 +62,48 @@ export class CanvasRenderer {
         } else {
           drawDiamond(ctx, sx, sy, tileW, tileH, "#f2f2f2");
         }
-
-        if (isBlocked(blockedMap, gx, gy)) {
-          const kind = blockedMap.get(`${gx},${gy}`);
-          const blockedUrl = blockedKinds[kind] ?? blockedKinds.fallback;
-          const blockedImage = this.assetManager?.get(blockedUrl);
-          if (blockedImage) {
-            drawTileImage(ctx, blockedImage, sx, sy, tileW, tileH);
-          } else {
-            drawDiamond(ctx, sx, sy, tileW, tileH, "#000");
-          }
-        }
       }
+    }
+
+    // --- blocked group sprites (single sprite per formation) ---
+    for (const group of state.blockedGroups ?? []) {
+      const viewPos = worldToView(state, group.anchor.x, group.anchor.y);
+      if (!viewPos) continue;
+      const { sx, sy } = gridToIsoTop(viewPos.vx, viewPos.vy, originX, originY, tileW, tileH);
+      const blockedUrl = blockedKinds[group.kind] ?? blockedKinds.fallback;
+      const blockedImage = this.assetManager?.get(blockedUrl);
+      if (blockedImage) {
+        drawTileImage(
+          ctx,
+          blockedImage,
+          sx + (group.offsetPx?.x ?? 0),
+          sy + (group.offsetPx?.y ?? 0),
+          tileW,
+          tileH
+        );
+      }
+    }
+
+    // --- single blocked tiles ---
+    for (const tile of state.blocked) {
+      const key = `${tile.x},${tile.y}`;
+      if (groupCoveredKeys.has(key)) continue;
+      const viewPos = worldToView(state, tile.x, tile.y);
+      if (!viewPos) continue;
+      const { sx, sy } = gridToIsoTop(viewPos.vx, viewPos.vy, originX, originY, tileW, tileH);
+      const blockedUrl = blockedKinds[tile.kind] ?? blockedKinds.fallback;
+      const blockedImage = this.assetManager?.get(blockedUrl);
+      if (blockedImage) {
+        drawTileImage(ctx, blockedImage, sx, sy, tileW, tileH);
+      } else {
+        drawDiamond(ctx, sx, sy, tileW, tileH, "#000");
+      }
+    }
+
+    for (const checkpoint of state.checkpoints ?? []) {
+      const viewPos = worldToView(state, checkpoint.x, checkpoint.y);
+      if (!viewPos) continue;
+      drawHighlight(ctx, state, checkpoint.x, checkpoint.y, originX, originY, tileW, tileH, "rgba(255, 235, 59, 0.26)");
     }
 
     // --- highlights ---
@@ -266,9 +300,10 @@ function drawShipSprite(ctx, image, cx, cy, tileW, tileH) {
 }
 
 function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba) {
-  if (gx < 0 || gx >= state.cols || gy < 0 || gy >= state.rows) return;
+  const viewPos = worldToView(state, gx, gy);
+  if (!viewPos) return;
 
-  const { sx, sy } = gridToIsoTop(gx, gy, originX, originY, tileW, tileH);
+  const { sx, sy } = gridToIsoTop(viewPos.vx, viewPos.vy, originX, originY, tileW, tileH);
   const halfW = tileW / 2;
   const halfH = tileH / 2;
 
@@ -281,6 +316,13 @@ function drawHighlight(ctx, state, gx, gy, originX, originY, tileW, tileH, rgba)
 
   ctx.fillStyle = rgba;
   ctx.fill();
+}
+
+function worldToView(state, wx, wy) {
+  const vx = wx - state.viewX0;
+  const vy = wy - state.viewY0;
+  if (vx < 0 || vx >= state.viewCols || vy < 0 || vy >= state.viewRows) return null;
+  return { vx, vy };
 }
 
 function resolveQueuedDestination(state, steps) {
@@ -298,8 +340,8 @@ function resolveQueuedDestination(state, steps) {
   const final = steps[1];
   if (!inBounds(state, corner.x, corner.y)) {
     return {
-      x: clamp(final.x, 0, state.cols - 1),
-      y: clamp(final.y, 0, state.rows - 1),
+      x: clamp(final.x, state.world.minX, state.world.maxX),
+      y: clamp(final.y, state.world.minY, state.world.maxY),
     };
   }
 

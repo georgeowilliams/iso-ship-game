@@ -2,7 +2,10 @@ import { DIR_V, leftOf, rightOf } from "./constants.js";
 
 // --- helpers (pure) ---
 export function inBounds(state, x, y) {
-  return x >= 0 && x < state.cols && y >= 0 && y < state.rows;
+  return x >= state.world.minX
+    && x <= state.world.maxX
+    && y >= state.world.minY
+    && y <= state.world.maxY;
 }
 
 export function makeBlockedMap(blocked) {
@@ -154,8 +157,8 @@ function resolveMoveForShip({ state, shipKey, otherKey, move, nowMs }) {
 
     const final = steps[1];
     const landing = {
-      x: clamp(final.x, 0, next.cols - 1),
-      y: clamp(final.y, 0, next.rows - 1),
+      x: clamp(final.x, next.world.minX, next.world.maxX),
+      y: clamp(final.y, next.world.minY, next.world.maxY),
     };
     ship.x = landing.x;
     ship.y = landing.y;
@@ -411,6 +414,19 @@ function structuredCloneLite(s) {
     playerPrevJumpTile: s.playerPrevJumpTile ? { ...s.playerPrevJumpTile } : null,
     enemyPrevJumpTile: s.enemyPrevJumpTile ? { ...s.enemyPrevJumpTile } : null,
     blocked: s.blocked.map(p => ({ ...p })),
+    blockedGroups: s.blockedGroups ? s.blockedGroups.map(group => ({
+      ...group,
+      anchor: group.anchor ? { ...group.anchor } : null,
+      footprint: group.footprint ? { ...group.footprint } : null,
+      offsetPx: group.offsetPx ? { ...group.offsetPx } : null,
+    })) : [],
+    world: { ...s.world },
+    checkpoints: s.checkpoints ? s.checkpoints.map(c => ({ ...c })) : [],
+    lastCheckpoint: s.lastCheckpoint ? {
+      ...s.lastCheckpoint,
+      ship: { ...s.lastCheckpoint.ship },
+      enemy: s.lastCheckpoint.enemy ? { ...s.lastCheckpoint.enemy } : undefined,
+    } : null,
     queuedAction: s.queuedAction ? { ...s.queuedAction } : null,
     projectiles: s.projectiles.map(p => ({ ...p })),
     lastShotTilesPlayer: s.lastShotTilesPlayer ? s.lastShotTilesPlayer.map(t => ({ ...t })) : [],
