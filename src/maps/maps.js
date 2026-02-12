@@ -179,8 +179,8 @@ export const MAPS = [
         background: { image: "/assets/desert/background.txt" },
         tiles: {
           variants: [
-            "/assets/desert/tiles/tile_1.txt",
-            "/assets/desert/tiles/tile_2.txt",
+            "/assets/desert/tiles/tile_1.png",
+            "/assets/desert/tiles/tile_2.png",
             "/assets/desert/tiles/tile_3.txt",
             "/assets/desert/tiles/tile_4.txt",
           ],
