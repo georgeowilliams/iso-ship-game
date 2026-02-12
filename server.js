@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import { TurnEngine } from "./src/core/turnEngine.js";
 import { VoteCollector } from "./src/core/voteCollector.js";
 import { createInitialState, cloneState } from "./src/core/state.js";
-import { getAllMaps, getMapById } from "./src/maps/maps.js";
+import { DEFAULT_MAP_ID } from "./src/maps/maps.js";
 import { YouTubeChatIngestor } from "./src/server/youtube/YouTubeChatIngestor.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,12 +23,9 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const YOUTUBE_SHORTS_VIDEO_ID = process.env.YOUTUBE_SHORTS_VIDEO_ID;
 const YOUTUBE_LIVE_VIDEO_ID = process.env.YOUTUBE_LIVE_VIDEO_ID;
 
-const maps = getAllMaps();
-const defaultMap = maps[0];
-
 const voteCollector = new VoteCollector();
 const engine = new TurnEngine({
-  initialState: createInitialState(defaultMap.id),
+  initialState: createInitialState(DEFAULT_MAP_ID),
   turnMs: TURN_MS,
   voteCollector,
   now: () => performance.now(),
@@ -156,8 +153,7 @@ function handleResultReset() {
   if (!engine.state.result || !engine.state.resultAtMs) return;
   const elapsed = performance.now() - engine.state.resultAtMs;
   if (elapsed < 2000) return;
-  const mapId = engine.state.mapId ?? defaultMap.id;
-  engine.loadMap(getMapById(mapId));
+  engine.reset(createInitialState(DEFAULT_MAP_ID));
   turnNumber = 1;
   lastOutcomeRef = engine.lastOutcome;
 }

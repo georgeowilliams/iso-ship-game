@@ -7,7 +7,7 @@ import {
   resolveEnemyShoot,
   computeShotPaths
 } from "./rules.js";
-import { computeCameraWindow, createInitialState } from "./state.js";
+import { computeCameraWindow } from "./state.js";
 
 const MOVE_SEGMENT_MS = 140;
 
@@ -184,8 +184,8 @@ export class TurnEngine {
     return { type: "move", move: choice, label: `VOTE: ${choice}` };
   }
 
-  loadMap(mapDef) {
-    this.state = createInitialState(mapDef?.id ?? mapDef);
+  reset(initialState) {
+    this.state = initialState;
     this.nextTickAt = this.now() + this.turnMs;
     this.lastOutcome = null;
     this.lastMoveSteps = null;
