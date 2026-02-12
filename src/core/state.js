@@ -1,8 +1,8 @@
 import { DIR } from "./constants.js";
-import { resolveMap } from "../maps/maps.js";
+import { getDefaultMap, getMapById } from "../maps/maps.js";
 
 export function createInitialState(mapId) {
-  const mapDef = resolveMap(mapId);
+  const mapDef = getMapById(mapId) ?? getDefaultMap();
   const world = mapDef.world ?? {
     minX: 0,
     minY: 0,
