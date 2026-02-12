@@ -204,10 +204,23 @@ export const MAPS = [
   },
 ];
 
-export function getAllMaps() {
-  return [...MAPS];
-}
+export const DEFAULT_MAP_ID = "islands";
 
 export function getMapById(id) {
-  return MAPS.find((map) => map.id === id) ?? MAPS[0];
+  if (!id) {
+    return getDefaultMap();
+  }
+  return MAPS.find((map) => map.id === id) ?? null;
+}
+
+export function resolveMap(id) {
+  return getMapById(id) ?? getDefaultMap();
+}
+
+export function getDefaultMap() {
+  const map = MAPS.find((candidate) => candidate.id === DEFAULT_MAP_ID);
+  if (!map) {
+    throw new Error(`DEFAULT_MAP_ID '${DEFAULT_MAP_ID}' was not found in MAPS.`);
+  }
+  return map;
 }
