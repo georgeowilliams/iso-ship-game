@@ -1,6 +1,6 @@
 import { CanvasRenderer } from "../render/renderer.js";
 import { AssetManager } from "../render/assetManager.js";
-import { getMapById } from "../maps/maps.js";
+import { getDefaultMap } from "../maps/maps.js";
 import { createWsClient } from "./wsClient.js";
 
 const canvas = document.getElementById("game");
@@ -21,7 +21,7 @@ const hudStatus = document.getElementById("hud-status");
 const assetManager = new AssetManager();
 const renderer = new CanvasRenderer(canvas, assetManager);
 
-let currentMap = null;
+const currentMap = getDefaultMap();
 let latestState = null;
 let queuedPreview = null;
 let overlayState = {};
@@ -35,11 +35,12 @@ const ACTION_TO_MOVE = {
   RIGHT: "R",
 };
 
+preloadMapAssets(currentMap);
+
 createWsClient({
   onState: (snapshot) => {
     latestState = snapshot.state;
     connectionStatus = "connected";
-    ensureMap(latestState.mapId);
     queuedPreview = voteToPreviewAction(snapshot.queuedAction);
     if (!hasTimeOffset && Number.isFinite(snapshot.serverNowMs)) {
       timeOffsetMs = performance.now() - snapshot.serverNowMs;
@@ -53,13 +54,6 @@ createWsClient({
     updateStatusBanner();
   },
 });
-
-function ensureMap(mapId) {
-  if (!mapId) return;
-  if (currentMap?.id === mapId) return;
-  currentMap = getMapById(mapId);
-  preloadMapAssets(currentMap);
-}
 
 function preloadMapAssets(map) {
   if (!map) return;

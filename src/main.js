@@ -4,10 +4,9 @@ import { VoteCollector } from "./core/voteCollector.js";
 import { CanvasRenderer } from "./render/renderer.js";
 import { AssetManager } from "./render/assetManager.js";
 import { createKeyboardAdapter } from "./input/keyboard.js";
-import { getAllMaps, getMapById } from "./maps/maps.js";
+import { DEFAULT_MAP_ID, getDefaultMap } from "./maps/maps.js";
 
 const canvas = document.getElementById("game");
-const mapSelect = document.getElementById("map-select");
 const startButton = document.getElementById("start-game");
 const quitButton = document.getElementById("quit");
 const hudOverlay = document.getElementById("hud-overlay");
@@ -27,11 +26,11 @@ const hudStatus = document.getElementById("hud-status");
 
 const voteCollector = new VoteCollector();
 const assetManager = new AssetManager();
-const maps = getAllMaps();
-let currentMap = maps[0];
+const currentMapId = DEFAULT_MAP_ID;
+const currentMap = getDefaultMap();
 
 const engine = new TurnEngine({
-  initialState: createInitialState(currentMap.id),
+  initialState: createInitialState(currentMapId),
   turnMs: 2000,
   voteCollector,
 });
@@ -68,27 +67,9 @@ keyboard.start((vote) => {
   voteCollector.addVote({ ...vote, choice: internalChoice });
 });
 
-if (mapSelect) {
-  for (const map of maps) {
-    const option = document.createElement("option");
-    option.value = map.id;
-    option.textContent = map.name;
-    mapSelect.appendChild(option);
-  }
-  mapSelect.value = currentMap.id;
-  mapSelect.addEventListener("change", () => {
-    currentMap = getMapById(mapSelect.value);
-    engine.loadMap(currentMap);
-    engine.state.mode = "start";
-    preloadMapAssets(currentMap);
-  });
-}
-
 if (startButton) {
   startButton.addEventListener("click", () => {
-    if (!mapSelect) return;
-    currentMap = getMapById(mapSelect.value);
-    engine.loadMap(currentMap);
+    engine.reset(createInitialState(currentMapId));
     startPlaying();
   });
 }
@@ -229,7 +210,7 @@ function startPlaying() {
 }
 
 function returnToStart() {
-  engine.loadMap(currentMap);
+  engine.reset(createInitialState(currentMapId));
   engine.state.mode = "start";
   engine.state.queuedAction = null;
   engine.state.result = null;
@@ -242,9 +223,6 @@ function syncUi() {
   if (engine.state.mode !== "playing") {
     queuedPreview = null;
     queuedActionLabel = null;
-  }
-  if (mapSelect) {
-    mapSelect.disabled = engine.state.mode !== "start";
   }
   if (startButton) {
     startButton.style.display = engine.state.mode === "start" ? "inline-block" : "none";
