@@ -18,8 +18,8 @@ describe("TurnEngine voting integration", () => {
     t = 2001;
     engine.update();
 
-    expect(engine.state.ship.x).toBe(3);
-    expect(engine.state.ship.y).toBe(2);
+    expect(engine.state.ship.x).toBe(12);
+    expect(engine.state.ship.y).toBe(11);
     expect(engine.lastOutcome?.moved).toBe(true);
     expect(voteCollector.resolveWinner()).toBe(null);
   });
@@ -39,8 +39,8 @@ describe("TurnEngine voting integration", () => {
     t = 2001;
     engine.update();
 
-    expect(engine.state.ship.x).toBe(4);
-    expect(engine.state.ship.y).toBe(2);
+    expect(engine.state.ship.x).toBe(13);
+    expect(engine.state.ship.y).toBe(11);
     expect(engine.lastOutcome?.moved).toBe(true);
     expect(voteCollector.resolveWinner()).toBe(null);
   });
@@ -49,14 +49,14 @@ describe("TurnEngine voting integration", () => {
     const voteCollector = new VoteCollector();
     let t = 0;
     const engine = new TurnEngine({
-      initialState: createInitialState("islands"),
+      initialState: createInitialState(),
       turnMs: 2000,
       now: () => t,
       voteCollector,
     });
 
-    engine.state.ship.x = 0;
-    engine.state.ship.y = 3;
+    engine.state.ship.x = 6;
+    engine.state.ship.y = 12;
     engine.state.ship.dir = 1;
     engine.state.lastCheckpointId = null;
     engine.state.lastCheckpoint = null;
@@ -76,15 +76,15 @@ describe("TurnEngine voting integration", () => {
     const voteCollector = new VoteCollector();
     let t = 0;
     const engine = new TurnEngine({
-      initialState: createInitialState("islands"),
+      initialState: createInitialState(),
       turnMs: 2000,
       now: () => t,
       voteCollector,
     });
 
     engine.state.ship.hp = 1;
-    engine.state.ship.x = 4;
-    engine.state.ship.y = 3;
+    engine.state.ship.x = 19;
+    engine.state.ship.y = 10;
     engine.state.ship.dir = 1;
     engine.state.lastCheckpointId = null;
     engine.state.lastCheckpoint = null;

@@ -6,58 +6,60 @@ import { leftOf, rightOf } from "../src/core/constants.js";
 describe("rules: movement", () => {
   it("F moves 1 forward when clear", () => {
     const s = createInitialState();
-    // facing N at (3,3) -> forward is (3,2)
+    const startX = s.ship.x;
+    const startY = s.ship.y;
     const { nextState, outcome } = resolveMove(s, "F", 0);
     expect(outcome.moved).toBe(true);
-    expect(nextState.ship.x).toBe(3);
-    expect(nextState.ship.y).toBe(2);
-    // prev becomes old tile
-    expect(nextState.prev).toEqual({ x: 3, y: 3 });
+    expect(nextState.ship.x).toBe(startX);
+    expect(nextState.ship.y).toBe(startY - 1);
+    expect(nextState.prev).toEqual({ x: startX, y: startY });
   });
 
   it("L checks step1 and step2; blocked on step1 fails + damages", () => {
     const s = createInitialState();
-    // Put a block directly in front of ship (3,2)
-    s.blocked = [{ x: 3, y: 2, kind: "rock" }];
+    const startX = s.ship.x;
+    const startY = s.ship.y;
+    s.blocked = [{ x: startX, y: startY - 1, kind: "rock" }];
     const { nextState, outcome } = resolveMove(s, "L", 123);
     expect(outcome.moved).toBe(false);
     expect(outcome.damaged).toBe(true);
     expect(nextState.ship.hp).toBe(5);
     expect(outcome.damage).toBe(1);
     expect(nextState.ship.dir).toBe(leftOf(s.ship.dir));
-    // ship does not move
-    expect(nextState.ship.x).toBe(3);
-    expect(nextState.ship.y).toBe(3);
-    // prev becomes current tile on fail (old == current)
-    expect(nextState.prev).toEqual({ x: 3, y: 3 });
+    expect(nextState.ship.x).toBe(startX);
+    expect(nextState.ship.y).toBe(startY);
+    expect(nextState.prev).toEqual({ x: startX, y: startY });
   });
 
   it("R checks step2; blocked on step2 fails + damages", () => {
     const s = createInitialState();
-    // Facing N: step1=(3,2), step2=(4,2)
-    s.blocked = [{ x: 4, y: 2, kind: "reef" }];
+    const startX = s.ship.x;
+    const startY = s.ship.y;
+    s.blocked = [{ x: startX + 1, y: startY - 1, kind: "reef" }];
     const { nextState, outcome } = resolveMove(s, "R", 0);
     expect(outcome.moved).toBe(true);
     expect(outcome.damaged).toBe(true);
     expect(nextState.ship.hp).toBe(5);
     expect(outcome.damage).toBe(1);
     expect(nextState.ship.dir).toBe(rightOf(s.ship.dir));
-    expect(nextState.ship.x).toBe(3);
-    expect(nextState.ship.y).toBe(2);
-    expect(nextState.prev).toEqual({ x: 3, y: 3 });
+    expect(nextState.ship.x).toBe(startX);
+    expect(nextState.ship.y).toBe(startY - 1);
+    expect(nextState.prev).toEqual({ x: startX, y: startY });
   });
 
   it("blocked wall prevents movement without damage", () => {
     const s = createInitialState();
-    s.blocked = [{ x: 3, y: 2, kind: "wall" }];
+    const startX = s.ship.x;
+    const startY = s.ship.y;
+    s.blocked = [{ x: startX, y: startY - 1, kind: "wall" }];
     const { nextState, outcome } = resolveMove(s, "F", 0);
     expect(outcome.moved).toBe(false);
     expect(outcome.damaged).toBe(false);
     expect(outcome.damage).toBe(0);
     expect(nextState.ship.hp).toBe(6);
-    expect(nextState.ship.x).toBe(3);
-    expect(nextState.ship.y).toBe(3);
-    expect(nextState.prev).toEqual({ x: 3, y: 3 });
+    expect(nextState.ship.x).toBe(startX);
+    expect(nextState.ship.y).toBe(startY);
+    expect(nextState.prev).toEqual({ x: startX, y: startY });
   });
 
   it("computeMoveSteps returns 2 steps for L/R", () => {
@@ -93,12 +95,12 @@ describe("rules: shooting paths", () => {
 
   it("OOB step2 truncates path but still spawns projectile", () => {
     const s = createInitialState();
-    s.ship.x = 5;
+    s.ship.x = s.world.maxX - 1;
     s.ship.y = 3;
     s.ship.dir = 0;
     const { nextState } = resolveShoot(s, 0);
-    const star = nextState.projectiles.find((p) => p.path?.[0]?.x === 6);
-    expect(star.path).toEqual([{ x: 6, y: 3 }]);
+    const star = nextState.projectiles.find((p) => p.path?.[0]?.x === s.world.maxX);
+    expect(star.path).toEqual([{ x: s.world.maxX, y: 3 }]);
   });
 
   it("OOB step1 prevents projectile spawn", () => {
